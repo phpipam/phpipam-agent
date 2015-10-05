@@ -356,7 +356,14 @@ class phpipamAgent extends Common_functions {
 	 * ---------------------------------
 	 */
 
+	/**
+	 * Initialize API
+	 *
+	 * @access private
+	 * @return void
+	 */
 	private function initialize_api () {
+		$this->throw_exception ("API agent type not yet supported!");
 	}
 
 

@@ -1,0 +1,30 @@
+Description
+===========
+phpipam-agent is a scanning agent for phpipam server to be deployed to remote servers
+
+License
+=======
+phpipam is released under the GPL v3 license, see misc/gpl-3.0.txt.
+
+Requirements
+============
+- PHP version 5.2+ with following modules (On windows php 5.3 is required!)
+	+ + pdo, pdo_mysql      : Adds support for mysql connections (if type=mysql)
+    + + gmp                 : Adds support for dev-libs/gmp (GNU MP library) -> to calculate IPv6 networks
+    + + json				: Adds supports for JSON data-interexchange format
+    + + pcntl				: Adds supports for threading via cli
+- PHP PEAR support (dev-php/pear)
+
+Install
+=======
+Just run index.php script with discover or update as argument.
+
+> For mysql agent type:
+	Make sure this client has read/write access to main phpipam database.
+	MySQL grants:
+		GRANT SELECT on `phpipam`.* TO 'username'@'hostname' identified by "password";
+		GRANT INSERT,UPDATE on `phpipam`.`ipaddresses` TO 'username'@'hostname' identified by "password";
+
+Contact
+=======
+miha.petkovsek@gmail.com

@@ -26,14 +26,13 @@ try {
 		$Database = new Database_PDO ($config['db']['user'], $config['db']['pass'], $config['db']['host'], $config['db']['port'], $config['db']['name']);
 		// test connection, will throw exception if it fails
 		$Database->connect ();
+		// new scan object
+		$Scan = new Scan ($Database);
 	}
 	else {
 		// scan without DB connection
 		$Database = false;
 	}
-
-	// new scan object
-	$Scan = new Scan ($Database);
 
 	// initialize and make default checks
 	$phpipam_agent = new phpipamAgent ($Database);

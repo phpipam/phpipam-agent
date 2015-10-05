@@ -1,36 +1,45 @@
 <?php
 
-/*	database connection details
+/*	phpipam agent config file
  ******************************/
-$db['host'] = "localhost";
-$db['user'] = "phpipam";
-$db['pass'] = "phpipamadmin";
-$db['name'] = "phpipam";
-$db['port'] = 3306;
 
-/**
- * php debugging on/off
- *
- * true  = SHOW all php errors
- * false = HIDE all php errors
- ******************************/
-$debugging = false;
+# set connection type
+# 	api,mysql;
+# ******************************/
+$config['type'] = "mysql";
 
-/**
- *	manual set session name for auth
- *	increases security
- *	optional
- */
-$phpsessname = "phpipam";
+# set agent key
+# ******************************/
+$config['key'] = "aad984d8314fcf644d3fb46886ea461f";
 
-/**
- *	BASE definition if phpipam
- * 	is not in root directory (e.g. /phpipam/)
- *
- *  Also change
- *	RewriteBase / in .htaccess
- ******************************/
-if(!defined('BASE'))
-define('BASE', "/");
+# set scan method and path to ping file
+#	ping, fping or pear
+# ******************************/
+//$config['method'] 	= "pear";
+//$config['pingpath'] = "/sbin/ping";
+
+$config['method'] 	= "fping";
+$config['pingpath'] = "/usr/local/sbin/fping";
+
+# how many concurrent threads (default: 32)
+# ****************************************/
+$config['threads']  = 32;
+
+# api settings, if api selected
+# ******************************/
+$config['api']['key'] = "";
+
+# send mail diff
+# ******************************/
+$config['sendmail'] = false;
+
+
+# mysql db settings, if mysql selected
+# ******************************/
+$config['db']['host'] = "localhost";
+$config['db']['user'] = "phpipam";
+$config['db']['pass'] = "phpipamadmin";
+$config['db']['name'] = "phpipam";
+$config['db']['port'] = 3306;
 
 ?>

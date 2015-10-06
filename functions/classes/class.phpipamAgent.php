@@ -434,6 +434,12 @@ class phpipamAgent extends Common_functions {
 		else {
 			$this->agent_details = $agent;
 		}
+
+		// update access time
+		try { $agent = $this->Database->runQuery("update `scanAgents` set `last_access` = ? where `id` = ? limit 1;", array(date("Y-m-d H:i:s"), $this->agent_details->id)); }
+		catch (Exception $e) {
+			$this->throw_exception ("Error: ".$e->getMessage());
+		}
 	}
 
 	/**

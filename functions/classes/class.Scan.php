@@ -35,16 +35,15 @@ class Scan extends Common_functions {
 	 *
 	 * @access public
 	 * @param Database_PDO $database
-	 * @param mixed $settings (default: null)
 	 * @return void
 	 */
-	public function __construct (Database_PDO $database, $settings = null) {
+	public function __construct (Database_PDO $database) {
 		# Save database object
 		$this->Database = $database;
-		# fetch settings
-		is_null($this->settings) ? $this->get_settings() : (object) $this->settings;
+		# get config
+		$this->read_config ();
 		# set type
-		$this->reset_scan_method ($this->settings->scanPingType);
+		$this->reset_scan_method ($this->config->pingpath);
 		# set php exec
 		$this->set_php_exec ();
 	}
@@ -354,10 +353,10 @@ class Scan extends Common_functions {
 	 */
 	protected function ping_address_method_ping ($address) {
 		# set ping command based on OS type
-		if	(PHP_OS == "FreeBSD" || PHP_OS == "NetBSD")                         { $cmd = $this->settings->scanPingPath." -c $this->icmp_count -W ".($this->icmp_timeout*1000)." $address 1>/dev/null 2>&1"; }
-		elseif(PHP_OS == "Linux" || PHP_OS == "OpenBSD")                        { $cmd = $this->settings->scanPingPath." -c $this->icmp_count -w $this->icmp_timeout $address 1>/dev/null 2>&1"; }
-		elseif(PHP_OS == "WIN32" || PHP_OS == "Windows" || PHP_OS == "WINNT")	{ $cmd = $this->settings->scanPingPath." -n $this->icmp_count -I ".($this->icmp_timeout*1000)." $address 1>/dev/null 2>&1"; }
-		else																	{ $cmd = $this->settings->scanPingPath." -c $this->icmp_count -n $address 1>/dev/null 2>&1"; }
+		if	(PHP_OS == "FreeBSD" || PHP_OS == "NetBSD")                         { $cmd = $this->config->pingpath." -c $this->icmp_count -W ".($this->icmp_timeout*1000)." $address 1>/dev/null 2>&1"; }
+		elseif(PHP_OS == "Linux" || PHP_OS == "OpenBSD")                        { $cmd = $this->config->pingpath." -c $this->icmp_count -w $this->icmp_timeout $address 1>/dev/null 2>&1"; }
+		elseif(PHP_OS == "WIN32" || PHP_OS == "Windows" || PHP_OS == "WINNT")	{ $cmd = $this->config->pingpath." -n $this->icmp_count -I ".($this->icmp_timeout*1000)." $address 1>/dev/null 2>&1"; }
+		else																	{ $cmd = $this->config->pingpath." -c $this->icmp_count -n $address 1>/dev/null 2>&1"; }
 
 		# execute command, return $retval
 	    exec($cmd, $output, $retval);
@@ -430,7 +429,7 @@ class Scan extends Common_functions {
 	 */
 	public function ping_address_method_fping ($address) {
 		# set command
-		$cmd = $this->settings->scanFPingPath." -c $this->icmp_count -t ".($this->icmp_timeout*1000)." $address";
+		$cmd = $this->config->pingpath." -c $this->icmp_count -t ".($this->icmp_timeout*1000)." $address";
 		# execute command, return $retval
 	    exec($cmd, $output, $retval);
 
@@ -476,7 +475,7 @@ class Scan extends Common_functions {
 	 */
 	public function ping_address_method_fping_subnet ($subnet_cidr, $return_result = false) {
 		# set command
-		$cmd = $this->settings->scanFPingPath." -c $this->icmp_count -t ".($this->icmp_timeout*1000)." -Ag $subnet_cidr";
+		$cmd = $this->config->pingpath." -c $this->icmp_count -t ".($this->icmp_timeout*1000)." -Ag $subnet_cidr";
 		# execute command, return $retval
 	    exec($cmd, $output, $retval);
 

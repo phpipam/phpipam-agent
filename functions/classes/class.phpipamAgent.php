@@ -12,7 +12,7 @@ class phpipamAgent extends Common_functions {
 
 	# general
 	private $types = null;					// (array) all possible connections
-	private $config = null;					// (object) config settings
+	protected $config = null;					// (object) config settings
 	private	$send_mail = true;				// (bool) set mail override flag
 	public $address_change = array();		// array of address changes
 
@@ -61,32 +61,6 @@ class phpipamAgent extends Common_functions {
 		$this->validate_ping_path ();
 		// save database
 		$this->Database = $Database;
-	}
-
-
-
-
-
-
-
-
-
-	/**
-	 * Read config from config.php file
-	 *
-	 * @access private
-	 * @return void
-	 */
-	private function read_config () {
-		// verify that config file exists
-		if (!file_exists(dirname(__FILE__) . "/../../config.php")) {
-			$this->throw_exception ("config.php file missing. Copy default from config.php.dist and set required settings!");
-		} else {
-			// get config
-			require(dirname(__FILE__) . "/../../config.php");
-			// save
-			$this->config = (object) $config;
-		}
 	}
 
 	/**

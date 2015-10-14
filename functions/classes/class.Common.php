@@ -18,6 +18,23 @@ class Common_functions  {
 	public function __construct () {
 	}
 
+	/**
+	 * Read config from config.php file
+	 *
+	 * @access protected
+	 * @return void
+	 */
+	protected function read_config () {
+		// verify that config file exists
+		if (!file_exists(dirname(__FILE__) . "/../../config.php")) {
+			$this->throw_exception ("config.php file missing. Copy default from config.php.dist and set required settings!");
+		} else {
+			// get config
+			require(dirname(__FILE__) . "/../../config.php");
+			// save
+			$this->config = (object) $config;
+		}
+	}
 
 	/**
 	 * fetches settings from database
@@ -52,16 +69,6 @@ class Common_functions  {
 
 		// throw exception
 		throw new Exception ($text);
-	}
-
-	/**
-	 * get_settings alias
-	 *
-	 * @access public
-	 * @return void
-	 */
-	public function settings () {
-		return $this->get_settings();
 	}
 
 	/**

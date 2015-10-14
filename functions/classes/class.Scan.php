@@ -598,9 +598,6 @@ class Scan extends Common_functions {
 		$subnet = $this->fetch_object("subnets", "id", $subnetId);
 		if($subnet===false)										 { $this->throw_exception ("Error: Invalid subnet ID provided"); }
 
-		// we should support only up to 4094 hosts!
-		if($this->get_max_hosts ($subnet->mask, "IPv4")>4094) 	 { $this->throw_exception ("Error: Scanning from GUI is only available for subnets up to /20 or 4094 hosts!"); }
-
 		# set array of addresses to scan, exclude existing!
 		$ip = $this->get_all_possible_subnet_addresses ($subnet->subnet, $subnet->mask);
 

@@ -1,9 +1,10 @@
-== 0.01.003
+== 0.01.004
 
 	Bugfixes:
 	----------------------------
 	+ update last access time;
 	+ fixed scan path ignored;
+	+ fixed /20 limit for scanning;
 
 == 0.01.001
 

@@ -202,8 +202,11 @@ class phpipamAgent extends Common_functions {
 	 * @return void
 	 */
 	private function validate_threading () {
-		if(!Thread::available()) {
-			$this->throw_exception ("Threading is required for scanning subnets. Please recompile PHP with pcntl extension");
+		// only for threaded
+		if($this->config->nonthreaded !== true) {
+			if(!Thread::available()) {
+				$this->throw_exception ("Threading is required for scanning subnets. Please recompile PHP with pcntl extension");
+			}
 		}
 	}
 
@@ -232,6 +235,10 @@ class phpipamAgent extends Common_functions {
 		// if mysql selected
 		if ($this->type=="mysql") {
 			$required_ext = array_merge($required_ext, array("PDO", "pdo_mysql"));
+		}
+		// if non-threaded permitted remove pcntl requirement
+		if ($this->config->nonthreaded === true) {
+			unset($required_ext['pcntl']);
 		}
 		// if api selected
 
@@ -408,7 +415,15 @@ class phpipamAgent extends Common_functions {
 		else {
 			$this->agent_details = $agent;
 		}
+	}
 
+	/**
+	 * Update last check for agent
+	 *
+	 * @access public
+	 * @return void
+	 */
+	public function update_agent_scantime () {
 		// update access time
 		try { $agent = $this->Database->runQuery("update `scanAgents` set `last_access` = ? where `id` = ? limit 1;", array(date("Y-m-d H:i:s"), $this->agent_details->id)); }
 		catch (Exception $e) {
@@ -448,9 +463,17 @@ class phpipamAgent extends Common_functions {
 		$addresses_tmp = $addresses[0];
 		$addresses 	   = $addresses[1];
 
-		// execute
-		if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping ($subnets, $addresses_tmp, $addresses); }
-		else							{ $subnets = $this->mysql_scan_discover_hosts_ping  ($subnets, $addresses); }
+		// non-threaded?
+		if ($this->config->nonthreaded === true) {
+			// execute
+			if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping_nonthreaded ($subnets, $addresses_tmp, $addresses); }
+			else							{ $subnets = $this->mysql_scan_discover_hosts_ping_nonthreaded  ($subnets, $addresses); }
+		}
+		else {
+			// execute
+			if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping ($subnets, $addresses_tmp, $addresses); }
+			else							{ $subnets = $this->mysql_scan_discover_hosts_ping  ($subnets, $addresses); }
+		}
 
 		// update database and send mail if requested
 		$this->mysql_scan_update_write_to_db ($subnets);
@@ -483,7 +506,6 @@ class phpipamAgent extends Common_functions {
 	 * This function fetches id, subnet and mask for all subnets
 	 *
 	 * @access private
-	 * @param int $type (default:update) - pingSubnet, discoverSubnet
 	 * @param int $agentId (default:null)
 	 * @return void
 	 */
@@ -499,6 +521,19 @@ class phpipamAgent extends Common_functions {
 		}
 		# die if nothing to scan
 		if (sizeof($subnets)==0)	{ die(); }
+        // if subnet has slaves dont check it
+        foreach ($subnets as $k=>$s) {
+    		try { $count = $this->Database->numObjectsFilter("subnets", "masterSubnetId", $s->id); }
+    		catch (Exception $e) {
+    			$this->Result->show("danger", _("Error: ").$e->getMessage());
+    			return false;
+    		}
+        	if ($count>0) {
+        		unset($subnets[$k]);
+        	}
+    	}
+		# die if nothing to scan
+		if (!isset($subnets))	   { die(); }
 		# result
 		return $subnets;
 	}
@@ -676,6 +711,143 @@ class phpipamAgent extends Common_functions {
 				}
 			}
 		}
+
+		// return result
+		return $subnets;
+	}
+
+
+	/**
+	 * Discover new host with fping - nonthreaded
+	 *
+	 * @access private
+	 * @param mixed $subnets
+	 * @return void
+	 */
+	private function mysql_scan_discover_hosts_fping_nonthreaded ($subnets, $addresses_tmp, $addresses) {
+/*
+
+		// run separately for each host
+		foreach ($address as $a) {
+			// ping
+			$ping = fping_subnet ($this->transform_to_dotted($subnets[$z]->subnet)."/".$subnets[$z]->mask );
+			// check result
+			var_dump($ping);
+		}
+
+		//run per MAX_THREADS
+		for ($m=0; $m<=sizeof($subnets); $m += $this->config->threads) {
+		    // create threads
+		    $threads = array();
+		    //fork processes
+		    for ($i = 0; $i <= $this->config->threads && $i <= sizeof($subnets); $i++) {
+		    	//only if index exists!
+		    	if(isset($subnets[$z])) {
+					//start new thread
+		            $threads[$z] = new Thread( 'fping_subnet' );
+					$threads[$z]->start_fping( $this->transform_to_dotted($subnets[$z]->subnet)."/".$subnets[$z]->mask );
+		            $z++;				//next index
+				}
+		    }
+		    // wait for all the threads to finish
+		    while( !empty( $threads ) ) {
+				foreach($threads as $index => $thread) {
+					$child_pipe = "/tmp/pipe_".$thread->getPid();
+
+					if (file_exists($child_pipe)) {
+						$file_descriptor = fopen( $child_pipe, "r");
+						$child_response = "";
+						while (!feof($file_descriptor)) {
+							$child_response .= fread($file_descriptor, 8192);
+						}
+						//we have the child data in the parent, but serialized:
+						$child_response = unserialize( $child_response );
+						//store
+						$subnets[$index]->discovered = $child_response;
+						//now, child is dead, and parent close the pipe
+						unlink( $child_pipe );
+						unset($threads[$index]);
+					}
+				}
+		        usleep(200000);
+		    }
+		}
+
+		//fping finds all subnet addresses, we must remove existing ones !
+		foreach($subnets as $sk=>$s) {
+			if (isset($s->discovered)) {
+				foreach($s->discovered as $rk=>$result) {
+					if(!in_array($this->transform_to_decimal($result), $addresses_tmp[$s->id])) {
+						unset($subnets[$sk]->discovered[$rk]);
+					}
+				}
+				//rekey
+				$subnets[$sk]->discovered = array_values($subnets[$sk]->discovered);
+			}
+		}
+*/
+
+		// return result
+		return $subnets;
+	}
+
+	/**
+	 * Discover new hosts with ping or pear - nonthreaded!
+	 *
+	 * @access private
+	 * @param mixed $subnets
+	 * @param mixed $addresses
+	 * @return void
+	 */
+	private function mysql_scan_discover_hosts_ping_nonthreaded ($subnets, $addresses) {
+		$z = 0;			//addresses array index
+
+/*
+		//run per MAX_THREADS
+	    for ($m=0; $m<=sizeof($addresses); $m += $this->config->threads) {
+	        // create threads
+	        $threads = array();
+
+	        //fork processes
+	        for ($i = 0; $i <= $this->config->threads && $i <= sizeof($addresses); $i++) {
+	        	//only if index exists!
+	        	if(isset($addresses[$z])) {
+					//start new thread
+		            $threads[$z] = new Thread( 'ping_address' );
+		            $threads[$z]->start( $this->transform_to_dotted( $addresses[$z]['ip_addr']) );
+					$z++;			//next index
+				}
+	        }
+
+	        // wait for all the threads to finish
+	        while( !empty( $threads ) ) {
+	            foreach( $threads as $index => $thread ) {
+	                if( ! $thread->isAlive() ) {
+						//unset dead hosts
+						if($thread->getExitCode() != 0) {
+							unset($addresses[$index]);
+						}
+	                    //remove thread
+	                    unset( $threads[$index]);
+	                }
+	            }
+	            usleep(200000);
+	        }
+		}
+
+		//ok, we have all available addresses, rekey them
+		if (sizeof($addresses)>0) {
+			foreach($addresses as $a) {
+				$add_tmp[$a['subnetId']][] = $this->transform_to_dotted($a['ip_addr']);
+			}
+			//add to scan_subnets as result
+			foreach($subnets as $sk=>$s) {
+				if(isset($add_tmp[$s->id])) {
+					$subnets[$sk]->discovered = $add_tmp[$s->id];
+				}
+			}
+		}
+*/
 
 		// return result
 		return $subnets;

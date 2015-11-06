@@ -42,6 +42,9 @@ try {
 
 	// execute
 	$phpipam_agent->execute ();
+
+	// update scan time
+	$phpipam_agent->update_agent_scantime ();
 }
 //catch any exceptions and report the problem
 catch ( Exception $e ) {

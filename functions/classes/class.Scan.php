@@ -43,7 +43,7 @@ class Scan extends Common_functions {
 		# get config
 		$this->read_config ();
 		# set type
-		$this->reset_scan_method ($this->config->pingpath);
+		$this->reset_scan_method ($this->config->method);
 		# set php exec
 		$this->set_php_exec ();
 	}

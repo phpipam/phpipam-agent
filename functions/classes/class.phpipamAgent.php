@@ -16,6 +16,10 @@ class phpipamAgent extends Common_functions {
 	private	$send_mail = true;				// (bool) set mail override flag
 	public $address_change = array();		// array of address changes
 
+	// set date for use throughout script
+	private $now     = false;               // time format
+    private $nowdate = false;               // date format
+
 	// agent details
 	private $agent_details  = null;			// (object) agent details
 	// connection types
@@ -43,6 +47,8 @@ class phpipamAgent extends Common_functions {
 	public function __construct ($Database) {
 		// read config file
 		$this->read_config ();
+		// set time
+		$this->set_now_time ();
 		// set valid connection types
 		$this->set_valid_conn_types ();
 		// set valid scan types
@@ -61,6 +67,17 @@ class phpipamAgent extends Common_functions {
 		$this->validate_ping_path ();
 		// save database
 		$this->Database = $Database;
+	}
+
+	/**
+	 * Sets execution start date in time and date format
+	 *
+	 * @access private
+	 * @return void
+	 */
+	private function set_now_time () {
+    	$this->nowdate  = date("Y-m-d H:i:s");
+    	$this->now      = strtotime($this->nowdate);
 	}
 
 	/**
@@ -425,7 +442,7 @@ class phpipamAgent extends Common_functions {
 	 */
 	public function update_agent_scantime () {
 		// update access time
-		try { $agent = $this->Database->runQuery("update `scanAgents` set `last_access` = ? where `id` = ? limit 1;", array(date("Y-m-d H:i:s"), $this->agent_details->id)); }
+		try { $agent = $this->Database->runQuery("update `scanAgents` set `last_access` = ? where `id` = ? limit 1;", array($this->nowdate, $this->agent_details->id)); }
 		catch (Exception $e) {
 			$this->throw_exception ("Error: ".$e->getMessage());
 		}
@@ -882,8 +899,8 @@ class phpipamAgent extends Common_functions {
 									"ip_addr"=>$this->transform_address($ip, "decimal"),
 									"dns_name"=>$hostname['name'],
 									"description"=>"-- autodiscovered --",
-									"note"=>"This host was autodiscovered on ".date("Y-m-d H:i:s"). " by agent ".$this->agent_details->name,
-									"lastSeen"=>date("Y-m-d H:i:s"),
+									"note"=>"This host was autodiscovered on ".$this->nowdate. " by agent ".$this->agent_details->name,
+									"lastSeen"=>$this->nowdate,
 									"state"=>"2"
 									);
 					//insert
@@ -941,7 +958,7 @@ class phpipamAgent extends Common_functions {
 				foreach ($s->discovered as $ip) {
 					# execute
 					$query = "update `ipaddresses` set `lastSeen` = ? where `subnetId` = ? and `ip_addr` = ? limit 1;";
-					$vars  = array(date("Y-m-d H:i:s"), $s->id, $this->transform_address($ip, "decimal"));
+					$vars  = array($this->nowdate, $s->id, $this->transform_address($ip, "decimal"));
 
 					try { $this->Database->runQuery($query, $vars); }
 					catch (Exception $e) {

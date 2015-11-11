@@ -14,6 +14,10 @@ class Scan extends Common_functions {
 	public $debugging = false;				//(bool) debugging flag
 	public $icmp_type = "ping";				//(varchar) default icmp type
 
+	// set date for use throughout script
+	private $now     = false;               // time format
+    private $nowdate = false;               // date format
+
 	/**
 	 * protected variables
 	 */
@@ -40,12 +44,25 @@ class Scan extends Common_functions {
 	public function __construct (Database_PDO $database) {
 		# Save database object
 		$this->Database = $database;
-		# get config
+		// set time
+		$this->set_now_time ();
+		// get config
 		$this->read_config ();
-		# set type
+		// set type
 		$this->reset_scan_method ($this->config->method);
-		# set php exec
+		// set php exec
 		$this->set_php_exec ();
+	}
+
+	/**
+	 * Sets execution start date in time and date format
+	 *
+	 * @access private
+	 * @return void
+	 */
+	private function set_now_time () {
+    	$this->nowdate  = date("Y-m-d H:i:s");
+    	$this->now      = strtotime($this->nowdate);
 	}
 
 	/**
@@ -550,7 +567,7 @@ class Scan extends Common_functions {
 	 */
 	public function ping_update_lastseen ($id) {
 		# execute
-		try { $this->Database->updateObject("ipaddresses", array("id"=>$id, "lastSeen"=>date("Y-m-d H:i:s")), "id"); }
+		try { $this->Database->updateObject("ipaddresses", array("id"=>$id, "lastSeen"=>$this->nowdate), "id"); }
 		catch (Exception $e) {
 			$this->throw_exception ("Error: ".$e->getMessage());
 		}

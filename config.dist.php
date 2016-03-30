@@ -21,6 +21,10 @@ $config['key'] = "aad984d8314fcf644d3fb46886ea461f";
 $config['method'] 	= "fping";
 $config['pingpath'] = "/usr/local/sbin/fping";
 
+# permit non-threaded checks (default: false)
+# ******************************/
+$config['nonthreaded'] = false;
+
 # how many concurrent threads (default: 32)
 # ****************************************/
 $config['threads']  = 32;

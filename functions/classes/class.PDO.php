@@ -8,19 +8,84 @@
 */
 class Database_PDO extends DB {
 
-	/* public vars */
+	/**
+	 * Database name
+	 *
+	 * (default value: '')
+	 *
+	 * @var string
+	 * @access public
+	 */
 	public $dbname 	= '';		// needed for DB check
 
-
-	/* protected vars */
+	/**
+	 * database hostname
+	 *
+	 * (default value: 'localhost')
+	 *
+	 * @var string
+	 * @access protected
+	 */
 	protected $host 	= 'localhost';
+
+	/**
+	 * Port
+	 *
+	 * (default value: '3306')
+	 *
+	 * @var string
+	 * @access protected
+	 */
 	protected $port 	= '3306';
+
+	/**
+	 * Charset
+	 *
+	 * (default value: 'utf8')
+	 *
+	 * @var string
+	 * @access protected
+	 */
 	protected $charset  = 'utf8';
+
+	/**
+	 * Username
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access protected
+	 */
 	protected $username = null;
+
+	/**
+	 * Password
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access protected
+	 */
 	protected $password = null;
 
+	/**
+	 * Install flag
+	 *
+	 * (default value: false)
+	 *
+	 * @var bool
+	 * @access public
+	 */
 	public $install = false;		//flag if installation is happenig!
 
+	/**
+	 * Debugging flag
+	 *
+	 * (default value: false)
+	 *
+	 * @var bool
+	 * @access protected
+	 */
 	protected $debug = false;
 
 	/**
@@ -36,8 +101,6 @@ class Database_PDO extends DB {
 	 * @return void
 	 */
 	public function __construct($username=null, $password=null, $host=null, $port=null, $dbname=null, $charset=null) {
-		# set parameters
-		$this->set_db_params ();
 		# rewrite user/pass if requested - for installation
 		$username==null ? : $this->username = $username;
 		$password==null ? : $this->password = $password;
@@ -47,24 +110,6 @@ class Database_PDO extends DB {
 
 		# construct
 		parent::__construct($this->username, $this->password, $this->charset);
-	}
-
-
-	/**
-	 * get database parameters from config.php
-	 *
-	 * @access private
-	 * @return void
-	 */
-	private function set_db_params () {
-		# use config file
-		require( dirname(__FILE__) . '/../../config.php' );
-		# set
-		$this->host 	= $db['host'];
-		$this->port 	= $db['port'];
-		$this->username = $db['user'];
-		$this->password = $db['pass'];
-		$this->dbname 	= $db['name'];
 	}
 
 	/**

@@ -24,6 +24,7 @@ Just run index.php script with discover or update as argument.
 	MySQL grants:
 		GRANT SELECT on `phpipam`.* TO 'username'@'hostname' identified by "password";
 		GRANT INSERT,UPDATE on `phpipam`.`ipaddresses` TO 'username'@'hostname' identified by "password";
+		GRANT UPDATE on phpipam.scanAgents TO 'username'@'hostname' identified by "password";
 
 Contact
 =======

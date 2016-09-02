@@ -6,35 +6,154 @@
 
 class phpipamAgent extends Common_functions {
 
-	/**
-	 * object holders
-	 */
 
-	# general
-	private $types = null;					// (array) all possible connections
-	protected $config = null;					// (object) config settings
-	private	$send_mail = true;				// (bool) set mail override flag
-	public $address_change = array();		// array of address changes
+	/**
+	 * all possible connections
+	 *
+	 * (default value: null)
+	 *
+	 * @var null|array
+	 * @access private
+	 */
+	private $types = null;
+
+	/**
+	 * config settings
+	 *
+	 * (default value: null)
+	 *
+	 * @var null|object
+	 * @access protected
+	 */
+	protected $config = null;
+
+	/**
+	 * set mail override flag
+	 *
+	 * (default value: true)
+	 *
+	 * @var bool
+	 * @access private
+	 */
+	private	$send_mail = true;
+
+	/**
+	 * array of address changes
+	 *
+	 * (default value: array())
+	 *
+	 * @var array
+	 * @access public
+	 */
+	public $address_change = array();
 
 	// set date for use throughout script
-	private $now     = false;               // time format
-    private $nowdate = false;               // date format
 
-	// agent details
-	private $agent_details  = null;			// (object) agent details
-	// connection types
-	public 	$conn_type = null;				// connection type - selected
-	private $conn_types = null;				// all connection types
-	// scan types
-	public 	$scan_type = null;				// scan type - selected
-	private $scan_types = null;				// all scan types
-	// ping methods
-	public 	$ping_type = null;				// ping type - selected
-	public 	$ping_types = null;				// all ping types
+	/**
+	 * time format
+	 *
+	 * (default value: false)
+	 *
+	 * @var bool
+	 * @access private
+	 */
+	private $now     = false;
 
-	// database object
-	protected $Database;					//for Database connection
-	protected $Scan;						//scan object
+    /**
+     * date format
+     *
+     * (default value: false)
+     *
+     * @var bool
+     * @access private
+     */
+    private $nowdate = false;
+
+	/**
+	 *  agent details
+	 *
+	 * (default value: null)
+	 *
+	 * @var null|object
+	 * @access private
+	 */
+	private $agent_details = null;
+
+	/**
+	 * connection type - selected
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access public
+	 */
+	public 	$conn_type = null;
+
+	/**
+	 * all connection types
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access private
+	 */
+	private $conn_types = null;
+
+	/**
+	 * scan type - selected
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access public
+	 */
+	public 	$scan_type = null;
+
+	/**
+	 * all scan types
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access private
+	 */
+	private $scan_types = null;
+
+	/**
+	 * ping type - selected
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access public
+	 */
+	public 	$ping_type = null;
+
+	/**
+	 * all ping types
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access public
+	 */
+	public 	$ping_types = null;
+
+	/**
+	 * for Database connection
+	 *
+	 * @var mixed
+	 * @access protected
+	 */
+	protected $Database;
+
+	/**
+	 * scan object
+	 *
+	 * @var mixed
+	 * @access protected
+	 */
+	protected $Scan;
 
 
 

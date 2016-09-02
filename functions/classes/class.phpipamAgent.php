@@ -685,7 +685,9 @@ class phpipamAgent extends Common_functions {
 		$z = 0;			//addresses array index
 
 		//run per MAX_THREADS
-	    for ($m=0; $m<=sizeof($addresses); $m += $this->config->threads) {
+        $num_of_addresses = sizeof($addresses);
+        for ($m=0; $m<=$num_of_addresses; $m += $this->config->threads) {
+
 	        // create threads
 	        $threads = array();
 

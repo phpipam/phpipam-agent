@@ -26,6 +26,13 @@ Just run index.php script with discover or update as argument.
 		GRANT INSERT,UPDATE on `phpipam`.`ipaddresses` TO 'username'@'hostname' identified by "password";
 		GRANT UPDATE on phpipam.scanAgents TO 'username'@'hostname' identified by "password";
 
+Scheduled scans
+===============
+For scheduled scans you have to run script from cron. Add something like following to your cron to scan
+each 15 minutes:
+
+ */15 * * * * php /where/your/agent/index.php update
+
 Contact
 =======
 miha.petkovsek@gmail.com

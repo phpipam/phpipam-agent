@@ -1075,7 +1075,6 @@ class phpipamAgent extends Common_functions {
 			$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
 		}
 		// loop
-		print_r($subnets);
 		foreach ($subnets as $s) {
 			if (sizeof($s->discovered)>0) {
 				foreach ($s->discovered as $ip) {

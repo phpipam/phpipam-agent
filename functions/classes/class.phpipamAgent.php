@@ -613,6 +613,7 @@ class phpipamAgent extends Common_functions {
 
 		// update database and send mail if requested
 		$this->mysql_scan_update_write_to_db ($subnets);
+		$this->reset_dhcp_addresses();
 	}
 
 	/**
@@ -1065,7 +1066,7 @@ class phpipamAgent extends Common_functions {
 	 *
 	 * @access private
 	 * @param mixed $subnets
-	 * @return void
+	 * @return voi
 	 */
 	private function mysql_scan_update_write_to_db ($subnets) {
 		# reset db connection for ping / pear
@@ -1074,6 +1075,7 @@ class phpipamAgent extends Common_functions {
 			$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
 		}
 		// loop
+		print_r($subnets);
 		foreach ($subnets as $s) {
 			if (sizeof($s->discovered)>0) {
 				foreach ($s->discovered as $ip) {
@@ -1089,6 +1091,59 @@ class phpipamAgent extends Common_functions {
 			}
 		}
 
+	}
+
+	/**
+	 * Resets DHCP Adresses 
+	 *
+	 * @access private
+	 * @return void
+	 */
+	private function reset_dhcp_addresses () {
+
+		# reset db connection 
+		unset($this->Database);
+		$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
+
+		# Get all used DHCP addresses
+		$query = "SELECT `ip_addr`, `subnetId`, `dns_name`, `lastSeen` FROM `ipaddresses` WHERE `state` = ? AND NOT `lastSeen` = ?;";
+		$vars = array("4", "0000-00-00 00:00:00");
+
+		// fetch details
+                try { $DHCPAddresses = $this->Database->getObjectsQuery($query, $vars); }
+		catch (Exception $e) {
+		$this->throw_exception ("Error: ".$e->getMessage());
+		}
+
+		# Get Warning and Offline time
+		$query = "select `pingStatus` from `settings`;";
+
+		// fetch details
+                try { $statuses = $this->Database->getObjectsQuery($query); }
+                catch (Exception $e) {
+                $this->throw_exception ("Error: ".$e->getMessage());
+                }
+
+		# Convert stdClass Objects to arrays
+		$statuses = json_decode(json_encode($statuses), True);
+		$DHCPAddresses = json_decode(json_encode($DHCPAddresses), True);
+
+		$statuses = explode(";", $statuses['0']['pingStatus']);
+
+		foreach ($DHCPAddresses as $addr) {
+			$tDiff = time() - strtotime($addr['lastSeen']);
+
+			if ( $tDiff > $statuses['1'])
+			{
+				$query = "update `ipaddresses` set `lastSeen` = ?, dns_name = '' where `subnetId` = ? and `ip_addr` = ? limit 1;";
+				$vars  = array("0000-00-00 00:00:00", $addr['subnetId'], $addr['ip_addr']);
+
+				try { $this->Database->runQuery($query, $vars); }
+				catch (Exception $e) {
+					$this->throw_exception("Error: ".$e->getMessage());
+				}
+			}
+		}
 	}
 
 

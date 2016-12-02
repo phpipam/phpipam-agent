@@ -1066,7 +1066,7 @@ class phpipamAgent extends Common_functions {
 	 *
 	 * @access private
 	 * @param mixed $subnets
-	 * @return voi
+	 * @return void
 	 */
 	private function mysql_scan_update_write_to_db ($subnets) {
 		# reset db connection for ping / pear

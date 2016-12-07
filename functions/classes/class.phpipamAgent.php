@@ -614,6 +614,7 @@ class phpipamAgent extends Common_functions {
 		// update database and send mail if requested
 		$this->mysql_scan_update_write_to_db ($subnets);
 		$this->reset_dhcp_addresses();
+		$this->reset_autodiscover_addresses();
 	}
 
 	/**
@@ -1066,7 +1067,7 @@ class phpipamAgent extends Common_functions {
 	 *
 	 * @access private
 	 * @param mixed $subnets
-	 * @return void
+	 * @return voi
 	 */
 	private function mysql_scan_update_write_to_db ($subnets) {
 		# reset db connection for ping / pear
@@ -1105,7 +1106,7 @@ class phpipamAgent extends Common_functions {
 		$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
 
 		# Get all used DHCP addresses
-		$query = "SELECT `ip_addr`, `subnetId`, `dns_name`, `lastSeen` FROM `ipaddresses` WHERE `state` = ? AND NOT `lastSeen` = ?;";
+		$query = "SELECT `ip_addr`, `subnetId`, `lastSeen` FROM `ipaddresses` WHERE `state` = ? AND NOT `lastSeen` = ?;";
 		$vars = array("4", "0000-00-00 00:00:00");
 
 		// fetch details
@@ -1134,7 +1135,7 @@ class phpipamAgent extends Common_functions {
 
 			if ( $tDiff > $statuses['1'])
 			{
-				$query = "update `ipaddresses` set `lastSeen` = ?, dns_name = '' where `subnetId` = ? and `ip_addr` = ? limit 1;";
+				$query = "UPDATE `ipaddresses` SET `lastSeen` = ?, dns_name = '' WHERE `subnetId` = ? AND `ip_addr` = ? limit 1;";
 				$vars  = array("0000-00-00 00:00:00", $addr['subnetId'], $addr['ip_addr']);
 
 				try { $this->Database->runQuery($query, $vars); }
@@ -1146,16 +1147,59 @@ class phpipamAgent extends Common_functions {
 	}
 
 
+	/**
+	 * Resets autodiscovered Adresses 
+	 *
+	 * @access private
+	 * @return void
+	 */
+	private function reset_autodiscover_addresses () {
 
+		# reset db connection 
+		unset($this->Database);
+		$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
 
+		# Get all autodiscoverd IPs
+		$query = "SELECT `ip_addr`, `subnetId`, `lastSeen` FROM `ipaddresses` WHERE `description` = ? AND NOT `lastSeen` = ?;";
+		$vars = array("-- autodiscovered --", "0000-00-00 00:00:00");
 
+		// fetch details
+                try { $AutoDiscAddresses = $this->Database->getObjectsQuery($query, $vars); }
+		catch (Exception $e) {
+		$this->throw_exception ("Error: ".$e->getMessage());
+		}
 
+		# Get Warning and Offline time
+		$query = "select `pingStatus` from `settings`;";
 
+		// fetch details
+                try { $statuses = $this->Database->getObjectsQuery($query); }
+                catch (Exception $e) {
+                $this->throw_exception ("Error: ".$e->getMessage());
+                }
 
+		# Convert stdClass Objects to arrays
+		$statuses = json_decode(json_encode($statuses), True);
+		$AutoDiscAddresses = json_decode(json_encode($AutoDiscAddresses), True);
 
+		$statuses = explode(";", $statuses['0']['pingStatus']);
 
+		foreach ($AutoDiscAddresses as $addr) {
+			$tDiff = time() - strtotime($addr['lastSeen']);
 
+			if ( $tDiff > $statuses['1'])
+			{
+				## Delete IP
+				$field  = "subnetId";   $value  = $addr['subnetId'];
+	                        $field2 = "ip_addr";    $value2 = $addr['ip_addr'];
 
+		                try { $this->Database->deleteRow("ipaddresses", $field, $value, $field2, $value2); }
+				catch (Exception $e) {
+                		$this->throw_exception ("Error: ".$e->getMessage());
+		                }
+			}
+		}
+	}
 
 
 	/**

@@ -443,7 +443,7 @@ class phpipamAgent extends Common_functions {
 		// initialize proper function
 		$init = initialize_.$this->conn_type;
 		// init
-		return $this->$init ();
+		return $this->{$init} ();
 	}
 
 
@@ -615,6 +615,23 @@ class phpipamAgent extends Common_functions {
 		$this->mysql_scan_update_write_to_db ($subnets);
 		$this->reset_dhcp_addresses();
 		$this->reset_autodiscover_addresses();
+
+		// updatelast scantime
+		foreach ($subnets as $s) {
+			$this->update_subnet_status_scantime ($s->id);
+		}
+	}
+
+	/**
+	 * Update last scan date
+	 *
+	 * @method update_subnet_status_scantime
+	 * @param  int $subnet_id
+	 * @return void
+	 */
+	private function update_subnet_status_scantime ($subnet_id) {
+		try { $this->Database->updateObject("subnets", array("id"=>$id, "lastScan"=>$this->nowdate), "id"); }
+		catch (Exception $e) {}
 	}
 
 	/**
@@ -638,6 +655,22 @@ class phpipamAgent extends Common_functions {
 
 		// update database and send mail if requested
 		$this->mysql_scan_discovered_write_to_db ($subnets);
+		// updatelast scantime
+		foreach ($subnets as $s) {
+			$this->update_subnet_discovery_scantime ($s->id);
+		}
+	}
+
+	/**
+	 * Update last discovery date
+	 *
+	 * @method update_subnet_discovery_scantime
+	 * @param  int $subnet_id
+	 * @return void
+	 */
+	private function update_subnet_discovery_scantime ($subnet_id) {
+		try { $this->Database->updateObject("subnets", array("id"=>$id, "lastDiscovery"=>$this->nowdate), "id"); }
+		catch (Exception $e) {}
 	}
 
 	/**
@@ -1094,14 +1127,14 @@ class phpipamAgent extends Common_functions {
 	}
 
 	/**
-	 * Resets DHCP Adresses 
+	 * Resets DHCP Adresses
 	 *
 	 * @access private
 	 * @return void
 	 */
 	private function reset_dhcp_addresses () {
 
-		# reset db connection 
+		# reset db connection
 		unset($this->Database);
 		$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
 
@@ -1148,14 +1181,14 @@ class phpipamAgent extends Common_functions {
 
 
 	/**
-	 * Resets autodiscovered Adresses 
+	 * Resets autodiscovered Adresses
 	 *
 	 * @access private
 	 * @return void
 	 */
 	private function reset_autodiscover_addresses () {
 
-		# reset db connection 
+		# reset db connection
 		unset($this->Database);
 		$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
 

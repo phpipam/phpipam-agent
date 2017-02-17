@@ -37,6 +37,14 @@ $config['api']['key'] = "";
 # ******************************/
 $config['sendmail'] = false;
 
+# remove inactive DHCP addresses
+#
+# 	reset_autodiscover_addresses: will remove addresses if description -- autodiscovered -- and is offline
+# 	remove_inactive_dhcp		: will remove inactive dhcp addresses
+# ******************************/
+$config['reset_autodiscover_addresses'] = false;
+$config['remove_inactive_dhcp']         = false;
+
 
 # mysql db settings, if mysql selected
 # ******************************/
@@ -45,5 +53,3 @@ $config['db']['user'] = "phpipam";
 $config['db']['pass'] = "phpipamadmin";
 $config['db']['name'] = "phpipam";
 $config['db']['port'] = 3306;
-
-?>

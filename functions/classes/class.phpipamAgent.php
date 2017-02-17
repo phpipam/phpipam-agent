@@ -613,8 +613,14 @@ class phpipamAgent extends Common_functions {
 
 		// update database and send mail if requested
 		$this->mysql_scan_update_write_to_db ($subnets);
-		$this->reset_dhcp_addresses();
-		$this->reset_autodiscover_addresses();
+		// reset dhcp
+		if($this->config->remove_inactive_dhcp===true) {
+			$this->reset_dhcp_addresses();
+		}
+		// reset autodiscovered DHCP addresses
+		if($this->config->reset_autodiscover_addresses===true) {
+			$this->reset_autodiscover_addresses();
+		}
 
 		// updatelast scantime
 		foreach ($subnets as $s) {
@@ -1197,19 +1203,19 @@ class phpipamAgent extends Common_functions {
 		$vars = array("-- autodiscovered --", "0000-00-00 00:00:00");
 
 		// fetch details
-                try { $AutoDiscAddresses = $this->Database->getObjectsQuery($query, $vars); }
+        try { $AutoDiscAddresses = $this->Database->getObjectsQuery($query, $vars); }
 		catch (Exception $e) {
-		$this->throw_exception ("Error: ".$e->getMessage());
+			$this->throw_exception ("Error: ".$e->getMessage());
 		}
 
 		# Get Warning and Offline time
 		$query = "select `pingStatus` from `settings`;";
 
 		// fetch details
-                try { $statuses = $this->Database->getObjectsQuery($query); }
-                catch (Exception $e) {
-                $this->throw_exception ("Error: ".$e->getMessage());
-                }
+        try { $statuses = $this->Database->getObjectsQuery($query); }
+        catch (Exception $e) {
+        	$this->throw_exception ("Error: ".$e->getMessage());
+        }
 
 		# Convert stdClass Objects to arrays
 		$statuses = json_decode(json_encode($statuses), True);
@@ -1220,16 +1226,15 @@ class phpipamAgent extends Common_functions {
 		foreach ($AutoDiscAddresses as $addr) {
 			$tDiff = time() - strtotime($addr['lastSeen']);
 
-			if ( $tDiff > $statuses['1'])
-			{
+			if ( $tDiff > $statuses['1']) {
 				## Delete IP
 				$field  = "subnetId";   $value  = $addr['subnetId'];
-	                        $field2 = "ip_addr";    $value2 = $addr['ip_addr'];
+	            $field2 = "ip_addr";    $value2 = $addr['ip_addr'];
 
-		                try { $this->Database->deleteRow("ipaddresses", $field, $value, $field2, $value2); }
+		        try { $this->Database->deleteRow("ipaddresses", $field, $value, $field2, $value2); }
 				catch (Exception $e) {
                 		$this->throw_exception ("Error: ".$e->getMessage());
-		                }
+		        }
 			}
 		}
 	}

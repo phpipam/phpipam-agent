@@ -373,7 +373,7 @@ class phpipamAgent extends Common_functions {
 		}
 		// if non-threaded permitted remove pcntl requirement
 		if ($this->config->nonthreaded === true) {
-			unset($required_ext['pcntl']);
+			unset($required_ext[2]);
 		}
 		// if api selected
 

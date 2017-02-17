@@ -1050,7 +1050,7 @@ class phpipamAgent extends Common_functions {
 		# reset db connection for ping / pear
 		if ($this->can_type!=="fping") {
 			unset($this->Database);
-			$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
+			$this->Database = new Database_PDO ();
 		}
 		// loop
 		foreach($subnets as $s) {
@@ -1116,7 +1116,7 @@ class phpipamAgent extends Common_functions {
 		# reset db connection for ping / pear
 		if ($this->can_type!=="fping") {
 			unset($this->Database);
-			$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
+			$this->Database = new Database_PDO ();
 		}
 		// loop
 		foreach ($subnets as $s) {
@@ -1146,7 +1146,7 @@ class phpipamAgent extends Common_functions {
 
 		# reset db connection
 		unset($this->Database);
-		$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
+		$this->Database = new Database_PDO ();
 
 		# Get all used DHCP addresses
 		$query = "SELECT `ip_addr`, `subnetId`, `lastSeen` FROM `ipaddresses` WHERE `state` = ? AND NOT `lastSeen` = ?;";
@@ -1200,7 +1200,7 @@ class phpipamAgent extends Common_functions {
 
 		# reset db connection
 		unset($this->Database);
-		$this->Database = new Database_PDO ($this->config->db['user'], $this->config->db['pass'], $this->config->db['host'], $this->config->db['port'], $this->config->db['name']);
+		$this->Database = new Database_PDO ();
 
 		# Get all autodiscoverd IPs
 		$query = "SELECT `ip_addr`, `subnetId`, `lastSeen` FROM `ipaddresses` WHERE `description` = ? AND NOT `lastSeen` = ?;";

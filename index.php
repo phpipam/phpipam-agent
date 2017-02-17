@@ -23,7 +23,7 @@ try {
 	// for database connections
 	if ($config['type']=="mysql") {
 		// open db connection
-		$Database = new Database_PDO ($config['db']['user'], $config['db']['pass'], $config['db']['host'], $config['db']['port'], $config['db']['name']);
+		$Database = new Database_PDO ();
 		// test connection, will throw exception if it fails
 		$Database->connect ();
 		// new scan object

@@ -787,10 +787,10 @@ class phpipamAgent extends Common_functions {
 		    	//only if index exists!
 		    	if(isset($subnets[$z])) {
 					//start new thread
-		            $threads[$z] = new Thread( 'fping_subnet' );
-					$threads[$z]->start_fping( $this->transform_to_dotted($subnets[$z]->subnet)."/".$subnets[$z]->mask );
-		            $z++;				//next index
-				}
+		        $threads[$z] = new Thread( 'fping_subnet' );
+					  $threads[$z]->start_fping( $this->transform_to_dotted($subnets[$z]->subnet)."/".$subnets[$z]->mask );
+				  }
+          $z++;				//next index
 		    }
 		    // wait for all the threads to finish
 		    while( !empty( $threads ) ) {

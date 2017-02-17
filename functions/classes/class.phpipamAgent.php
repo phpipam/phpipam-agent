@@ -160,7 +160,7 @@ class phpipamAgent extends Common_functions {
 	/**
 	 * __construct method
 	 *
-	 * @access public
+	 * @param resource $Database
 	 * @return void
 	 */
 	public function __construct ($Database) {
@@ -288,7 +288,6 @@ class phpipamAgent extends Common_functions {
 	 * Sets type of ping to be executed
 	 *
 	 * @access public
-	 * @param mixed $type
 	 * @return void
 	 */
 	public function set_ping_type () {
@@ -386,9 +385,9 @@ class phpipamAgent extends Common_functions {
  	 * Resolves hostname
  	 *
  	 * @access public
- 	 * @param mixed $address		address object
- 	 * @param boolena $override		override DNS resolving flag
- 	 * @return void
+ 	 * @param object $address
+ 	 * @param boolean $override override DNS resolving flag
+ 	 * @return array
  	 */
  	public function resolve_address ($address, $override=false) {
 	 	# make sure it is dotted format
@@ -416,7 +415,7 @@ class phpipamAgent extends Common_functions {
 	 * Prints success
 	 *
 	 * @access private
-	 * @param mixed $text
+	 * @param string|array $text
 	 * @return void
 	 */
 	private function print_success ($text) {
@@ -429,7 +428,7 @@ class phpipamAgent extends Common_functions {
 		} else {
 			$success[] = $text."\n";
 		}
-		// throw exception
+		// print
 		print implode("\n",$success);
 	}
 
@@ -602,12 +601,12 @@ class phpipamAgent extends Common_functions {
 		// non-threaded?
 		if ($this->config->nonthreaded === true) {
 			// execute
-			if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping_nonthreaded ($subnets, $addresses_tmp, $addresses); }
+			if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping_nonthreaded ($subnets, $addresses_tmp); }
 			else							{ $subnets = $this->mysql_scan_discover_hosts_ping_nonthreaded  ($subnets, $addresses); }
 		}
 		else {
 			// execute
-			if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping ($subnets, $addresses_tmp, $addresses); }
+			if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping ($subnets, $addresses_tmp); }
 			else							{ $subnets = $this->mysql_scan_discover_hosts_ping  ($subnets, $addresses); }
 		}
 
@@ -656,7 +655,7 @@ class phpipamAgent extends Common_functions {
 		$addresses 	   = $addresses[1];
 
 		// execute
-		if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping ($subnets, $addresses_tmp, $addresses); }
+		if ($this->ping_type=="fping")	{ $subnets = $this->mysql_scan_discover_hosts_fping ($subnets, $addresses_tmp); }
 		else							{ $subnets = $this->mysql_scan_discover_hosts_ping  ($subnets, $addresses); }
 
 		// update database and send mail if requested
@@ -719,11 +718,13 @@ class phpipamAgent extends Common_functions {
 	 * Fetches addresses to scan
 	 *
 	 * @access private
-	 * @param mixed $subnets
-	 * @param mixed $type (discovery, update)
+	 * @param array $subnets
+	 * @param string $type (discovery, update)
 	 * @return void
 	 */
 	private function mysql_fetch_addresses ($subnets, $type) {
+		// array check
+		if(!is_array($subnets))     { die(); }
 		// loop through subnets and save addresses to scan
 		foreach($subnets as $s) {
 			// if subnet has slaves dont check it
@@ -754,10 +755,12 @@ class phpipamAgent extends Common_functions {
 	 * Check if subnet has slaves
 	 *
 	 * @access private
-	 * @param mixed $subnetId
+	 * @param int $subnetId
 	 * @return void
 	 */
 	private function mysql_check_slaves ($subnetId) {
+		// int check
+		if(!is_numeric($subnetId))	{ return false; }
 		// check
 		try { $count = $this->Database->numObjectsFilter("subnets", "masterSubnetId", $subnetid); }
 		catch (Exception $e) {
@@ -772,10 +775,11 @@ class phpipamAgent extends Common_functions {
 	 * Discover new host with fping
 	 *
 	 * @access private
-	 * @param mixed $subnets
+	 * @param array $subnets
+	 * @param array $addresses_tmp
 	 * @return void
 	 */
-	private function mysql_scan_discover_hosts_fping ($subnets, $addresses_tmp, $addresses) {
+	private function mysql_scan_discover_hosts_fping ($subnets, $addresses_tmp) {
 		$z = 0;			//addresses array index
 
 		//run per MAX_THREADS
@@ -789,8 +793,8 @@ class phpipamAgent extends Common_functions {
 					//start new thread
 		            $threads[$z] = new Thread( 'fping_subnet' );
 					$threads[$z]->start_fping( $this->transform_to_dotted($subnets[$z]->subnet)."/".$subnets[$z]->mask );
-		            $z++;				//next index
 				}
+	            $z++;				//next index
 		    }
 		    // wait for all the threads to finish
 		    while( !empty( $threads ) ) {
@@ -903,7 +907,7 @@ class phpipamAgent extends Common_functions {
 	 * @param mixed $subnets
 	 * @return void
 	 */
-	private function mysql_scan_discover_hosts_fping_nonthreaded ($subnets, $addresses_tmp, $addresses) {
+	private function mysql_scan_discover_hosts_fping_nonthreaded ($subnets, $addresses_tmp) {
 /*
 
 		// run separately for each host

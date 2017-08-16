@@ -635,7 +635,7 @@ class phpipamAgent extends Common_functions {
 	 * @return void
 	 */
 	private function update_subnet_status_scantime ($subnet_id) {
-		try { $this->Database->updateObject("subnets", array("id"=>$id, "lastScan"=>$this->nowdate), "id"); }
+		try { $this->Database->updateObject("subnets", array("id"=>$subnet_id, "lastScan"=>$this->nowdate), "id"); }
 		catch (Exception $e) {}
 	}
 

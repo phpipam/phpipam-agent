@@ -980,42 +980,12 @@ class phpipamAgent extends Common_functions {
 	 * @access private
 	 * @param mixed $subnets
 	 * @param mixed $addresses
-	 * @return void
+	 * @return $subnets
 	 */
 	private function mysql_scan_discover_hosts_ping_nonthreaded ($subnets, $addresses) {
-		$z = 0;			//addresses array index
 
-/*
-		//run per MAX_THREADS
-	    for ($m=0; $m<=sizeof($addresses); $m += $this->config->threads) {
-	        // create threads
-	        $threads = array();
-
-	        //fork processes
-	        for ($i = 0; $i <= $this->config->threads && $i <= sizeof($addresses); $i++) {
-	        	//only if index exists!
-	        	if(isset($addresses[$z])) {
-					//start new thread
-		            $threads[$z] = new Thread( 'ping_address' );
-		            $threads[$z]->start( $this->transform_to_dotted( $addresses[$z]['ip_addr']) );
-					$z++;			//next index
-				}
-	        }
-
-	        // wait for all the threads to finish
-	        while( !empty( $threads ) ) {
-	            foreach( $threads as $index => $thread ) {
-	                if( ! $thread->isAlive() ) {
-						//unset dead hosts
-						if($thread->getExitCode() != 0) {
-							unset($addresses[$index]);
-						}
-	                    //remove thread
-	                    unset( $threads[$index]);
-	                }
-	            }
-	            usleep(200000);
-	        }
+		for ($i = 0; $i <= sizeof($addresses); $i++) {
+			ping_address( $this->transform_to_dotted( $addresses[$z]['ip_addr']) );
 		}
 
 		//ok, we have all available addresses, rekey them
@@ -1030,7 +1000,6 @@ class phpipamAgent extends Common_functions {
 				}
 			}
 		}
-*/
 
 		// return result
 		return $subnets;

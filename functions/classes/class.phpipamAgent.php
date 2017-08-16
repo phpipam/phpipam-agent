@@ -762,7 +762,7 @@ class phpipamAgent extends Common_functions {
 		// int check
 		if(!is_numeric($subnetId))	{ return false; }
 		// check
-		try { $count = $this->Database->numObjectsFilter("subnets", "masterSubnetId", $subnetid); }
+		try { $count = $this->Database->numObjectsFilter("subnets", "masterSubnetId", $subnetId); }
 		catch (Exception $e) {
 			$this->Result->show("danger", _("Error: ").$e->getMessage());
 			return false;

@@ -1017,7 +1017,7 @@ class phpipamAgent extends Common_functions {
 		$discovered = 0;				//for mailing
 
 		# reset db connection for ping / pear
-		if ($this->can_type!=="fping") {
+		if ($this->scan_type!=="fping") {
 			unset($this->Database);
 			$this->Database = new Database_PDO ();
 		}

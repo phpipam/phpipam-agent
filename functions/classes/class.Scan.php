@@ -372,7 +372,7 @@ class Scan extends Common_functions {
 		# set ping command based on OS type
 		if	(PHP_OS == "FreeBSD" || PHP_OS == "NetBSD")                         { $cmd = $this->config->pingpath." -c $this->icmp_count -W ".($this->icmp_timeout*1000)." $address 1>/dev/null 2>&1"; }
 		elseif(PHP_OS == "Linux" || PHP_OS == "OpenBSD")                        { $cmd = $this->config->pingpath." -c $this->icmp_count -w $this->icmp_timeout $address 1>/dev/null 2>&1"; }
-		elseif(PHP_OS == "WIN32" || PHP_OS == "Windows" || PHP_OS == "WINNT")	{ $cmd = $this->config->pingpath." -n $this->icmp_count -I ".($this->icmp_timeout*1000)." $address 1>/dev/null 2>&1"; }
+		elseif(PHP_OS == "WIN32" || PHP_OS == "Windows" || PHP_OS == "WINNT")	{ $cmd = $this->config->pingpath." -n $this->icmp_count -I ".($this->icmp_timeout*1000)." $address"; }
 		else																	{ $cmd = $this->config->pingpath." -c $this->icmp_count -n $address 1>/dev/null 2>&1"; }
 
 		# execute command, return $retval

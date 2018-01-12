@@ -440,7 +440,7 @@ class phpipamAgent extends Common_functions {
 	 */
 	public function execute () {
 		// initialize proper function
-		$init = initialize_.$this->conn_type;
+		$init = 'initialize_'.$this->conn_type;
 		// init
 		return $this->{$init} ();
 	}

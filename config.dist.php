@@ -70,4 +70,5 @@ $config['db']['ssl_key']    = '/path/to/cert.key';             // path to an SSL
 $config['db']['ssl_cert']   = '/path/to/cert.crt';             // path to an SSL certificate file. Only makes sense combined with ssl_key
 $config['db']['ssl_ca']     = '/path/to/ca.crt';               // path to a file containing SSL CA certs
 $config['db']['ssl_capath'] = '/path/to/ca_certs';             // path to a directory containing CA certs
-$config['db']['ssl_cipher'] = '/DHE-RSA-AES256-SHA:AES128-SHA'; // one or more SSL Ciphers
+$config['db']['ssl_cipher'] = 'DHE-RSA-AES256-SHA:AES128-SHA'; // one or more SSL Ciphers
+$config['db']['ssl_verify'] = true;                            // Verify Common Name (CN) of server certificate?

@@ -392,8 +392,8 @@ class phpipamAgent extends Common_functions {
  	public function resolve_address ($address, $override=false) {
 	 	# make sure it is dotted format
 	 	$address->ip = $this->transform_address ($address->ip_addr, "dotted");
-		# if dns_nameis set try to check
-		if(empty($address->dns_name) || is_null($address->dns_name)) {
+		# if hostname is set try to check
+		if(empty($address->hostname) || is_null($address->hostname)) {
 			# if permitted in settings
 			if($this->settings->enableDNSresolving == 1 || $override) {
 				# resolve
@@ -407,7 +407,7 @@ class phpipamAgent extends Common_functions {
 			}
 		}
 		else {
-				return array("class"=>"", "name"=>$address->dns_name);
+				return array("class"=>"", "name"=>$address->hostname);
 		}
 	}
 
@@ -1032,7 +1032,7 @@ class phpipamAgent extends Common_functions {
 					//set update query
 					$values = array("subnetId"=>$s->id,
 									"ip_addr"=>$this->transform_address($ip, "decimal"),
-									"dns_name"=>$hostname['name'],
+									"hostname"=>$hostname['name'],
 									"description"=>"-- autodiscovered --",
 									"note"=>"This host was autodiscovered on ".$this->nowdate. " by agent ".$this->agent_details->name,
 									"lastSeen"=>$this->nowdate,
@@ -1147,7 +1147,7 @@ class phpipamAgent extends Common_functions {
 
 			if ( $tDiff > $statuses['1'])
 			{
-				$query = "UPDATE `ipaddresses` SET `lastSeen` = ?, dns_name = '' WHERE `subnetId` = ? AND `ip_addr` = ? limit 1;";
+				$query = "UPDATE `ipaddresses` SET `lastSeen` = ?, hostname = '' WHERE `subnetId` = ? AND `ip_addr` = ? limit 1;";
 				$vars  = array("0000-00-00 00:00:00", $addr['subnetId'], $addr['ip_addr']);
 
 				try { $this->Database->runQuery($query, $vars); }

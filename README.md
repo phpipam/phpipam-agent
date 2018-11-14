@@ -30,7 +30,9 @@ Just run index.php script with discover or update as argument.
 For scheduled scans you have to run script from cron. Add something like following to your cron to scan
 each 15 minutes:
 
- `*/15 * * * * php /where/your/agent/index.php update`
-
+ ```
+*/15 * * * * php /where/your/agent/index.php update
+*/15 * * * * php /where/your/agent/index.php discover
+```
 ## Contact
 `miha.petkovsek@gmail.com`

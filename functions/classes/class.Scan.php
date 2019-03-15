@@ -137,7 +137,7 @@ class Scan extends Common_functions {
 				return false;
 			}
 			# save to cache array
-			if(sizeof($res)>0) {
+			if($res !== null) {
 				$this->table[$table][$method][$id] = (object) $res;
 				return $res;
 			}

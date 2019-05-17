@@ -42,8 +42,8 @@ $config['sendmail'] = false;
 # 	reset_autodiscover_addresses: will remove addresses if description -- autodiscovered -- and is offline
 # 	remove_inactive_dhcp		: will remove inactive dhcp addresses
 # ******************************/
-$config['reset_autodiscover_addresses'] = false;
-$config['remove_inactive_dhcp']         = false;
+$config['reset_autodiscover_addresses'] = true;
+$config['remove_inactive_dhcp']         = true;
 
 
 # mysql db settings, if mysql selected

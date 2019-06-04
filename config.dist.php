@@ -27,7 +27,7 @@ $config['nonthreaded'] = false;
 
 # how many concurrent threads (default: 32)
 # ****************************************/
-$config['threads']  = 32;
+$config['threads']  = 256;
 
 # api settings, if api selected
 # ******************************/

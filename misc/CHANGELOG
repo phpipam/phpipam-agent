@@ -1,3 +1,14 @@
+== 0.02
+
+	Changes
+	----------------------------
+	PHPMailer moved to git submodule. After updating to 0.02 run "git submodule update --init --recursive"
+
+	Bugfixes:
+	----------------------------
+	+ Synchronized bugfixed library code with https://github.com/phpipam/phpipam
+	+ php7.x compatibility fixes.
+
 == 0.01.004
 
 	Bugfixes:

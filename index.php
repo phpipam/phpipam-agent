@@ -15,7 +15,6 @@
 
 /* require classes */
 require('functions/functions.php');
-require('config.php');
 
 # start phpipam-agent class
 try {
@@ -28,6 +27,8 @@ try {
 		$Database->connect ();
 		// new scan object
 		$Scan = new Scan ($Database);
+		$Scan->ping_set_exit(true);
+		$Scan->set_debugging( Config::ValueOf('debugging', false) );
 	}
 	else {
 		// scan without DB connection

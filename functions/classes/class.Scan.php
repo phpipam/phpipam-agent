@@ -7,29 +7,95 @@
 class Scan extends Common_functions {
 
 	/**
-	 * public variables
+	 * (array of objects) to store addresses, address ID is array index
+	 *
+	 * @var mixed
+	 * @access public
 	 */
-	public $addresses;						//(array of objects) to store addresses, address ID is array index
-	public $php_exec = null;				//(int) php executable file
-	public $debugging = false;				//(bool) debugging flag
-	public $icmp_type = "ping";				//(varchar) default icmp type
-
-	// set date for use throughout script
-	private $now     = false;               // time format
-    private $nowdate = false;               // date format
+	public $addresses;
 
 	/**
-	 * protected variables
+	 * php executable file
+	 *
+	 * (default value: null)
+	 *
+	 * @var mixed
+	 * @access public
 	 */
-	protected $icmp_timeout = 1;			//(int) icmp timeout
-	protected $icmp_count = 1;				//(int) icmp retries
-	protected $icmp_exit = true;			//(boolean) exit or return icmp status
+	public $php_exec = null;
 
 	/**
-	 * object holders
+	 * default icmp type
+	 *
+	 * (default value: "ping")
+	 *
+	 * @var string
+	 * @access public
 	 */
-	protected $Result;						//for Result printing
-	protected $Database;					//for Database connection
+	public $icmp_type = "ping";
+
+	/**
+	 * Sets OS type
+	 *
+	 * @var string
+	 */
+	public $os_type = "default";
+
+	/**
+	 * icmp timeout
+	 *
+	 * (default value: 1)
+	 *
+	 * @var int
+	 * @access protected
+	 */
+	protected $icmp_timeout = 1;
+
+	/**
+	 * icmp retries
+	 *
+	 * (default value: 1)
+	 *
+	 * @var int
+	 * @access protected
+	 */
+	protected $icmp_count = 1;
+
+	/**
+	 *  exit or return icmp status
+	 *
+	 * (default value: false)
+	 *
+	 * @var bool
+	 * @access protected
+	 */
+	protected $icmp_exit = false;
+
+	/**
+	 * Database
+	 *
+	 * @var mixed
+	 * @access protected
+	 */
+	protected $Database;
+
+	/**
+	 * Subnets
+	 *
+	 * @var mixed
+	 * @access protected
+	 */
+	protected $Subnets;
+
+	/**
+	 * Addresses
+	 *
+	 * @var mixed
+	 * @access protected
+	 */
+	protected $Addresses;
+
+
 
 
 
@@ -39,30 +105,38 @@ class Scan extends Common_functions {
 	 *
 	 * @access public
 	 * @param Database_PDO $database
-	 * @return void
+	 * @param mixed $settings (default: null)
 	 */
-	public function __construct (Database_PDO $database) {
+	public function __construct (Database_PDO $database, $settings = null) {
+		parent::__construct();
+
 		# Save database object
 		$this->Database = $database;
-		// set time
-		$this->set_now_time ();
-		// get config
-		$this->read_config ();
-		// set type
-		$this->reset_scan_method ($this->config->method);
-		// set php exec
+		# initialize Result
+		$this->Result = new Result ();
+		# fetch settings
+		$this->settings = is_null($this->settings) ? $this->get_settings() : (object) $this->settings;
+		# set type
+		$this->reset_scan_method ($this->settings->scanPingType);
+		# set OS type
+		$this->set_os_type ();
+		# set php exec
 		$this->set_php_exec ();
+		# Log object
+		$this->Log = new Logging ($this->Database, $this->settings);
+
+		if ($errmsg = php_feature_missing(null, ['exec']))
+			$this->Result->show("danger", $errmsg, true);
 	}
 
 	/**
-	 * Sets execution start date in time and date format
+	 * Returns all possible ping types / apps
 	 *
-	 * @access private
-	 * @return void
+	 * @access public
+	 * @return array
 	 */
-	private function set_now_time () {
-    	$this->nowdate  = date("Y-m-d H:i:s");
-    	$this->now      = strtotime($this->nowdate);
+	public function ping_fetch_types () {
+		return array("ping", "pear", "fping");
 	}
 
 	/**
@@ -73,7 +147,18 @@ class Scan extends Common_functions {
 	 * @return void
 	 */
 	public function reset_scan_method ($method) {
-		$this->icmp_type = $method;
+		// fetch possible methods
+		$possible = $this->ping_fetch_types ();
+		//check
+		if(!in_array($method, $possible)) {
+			//die or print?
+			if($this->icmp_exit)				{ die(json_encode(array("status"=>1, "error"=>"Invalid scan method"))); }
+			else								{ $this->Result->show("danger", "Invalid scan method", true); }
+		}
+		//ok
+		else {
+			$this->icmp_type = $method;
+		}
 	}
 
 	/**
@@ -83,233 +168,47 @@ class Scan extends Common_functions {
 	 * @return void
 	 */
 	private function set_php_exec () {
-		$this->php_exec = PHP_BINDIR."/php";
+		// Invoked via CLI, use current php-cli binary if known (>php5.3)
+		if ( php_sapi_name() === "cli" && defined('PHP_BINARY') ) {
+			$this->php_exec = PHP_BINARY;
+			return;
+		}
+
+		// Invoked via HTML (or php5.3)
+		$php_cli_binary = Config::ValueOf('php_cli_binary');
+
+		// Check for user specified php-cli binary (Multiple php versions installed)
+		if ( !empty($php_cli_binary) ) {
+			$this->php_exec = $php_cli_binary;
+			return;
+		}
+
+		// Default: Use system default php version symlinked to php in PHP_BINDIR
+		$this->php_exec = $this->os_type=="Windows" ? PHP_BINARY : PHP_BINDIR."/php";
 	}
 
 	/**
-	 * Fetch all objects from specified table in database
+	 * Sets OS type
+	 *
+	 * @method set_os_type
+	 */
+	private function set_os_type () {
+		if	(PHP_OS == "FreeBSD" || PHP_OS == "NetBSD")                         { $this->os_type = "FreeBSD"; }
+		elseif(PHP_OS == "Linux" || PHP_OS == "OpenBSD")                        { $this->os_type = "Linux"; }
+		elseif(PHP_OS == "WIN32" || PHP_OS == "Windows" || PHP_OS == "WINNT")	{ $this->os_type = "Windows"; }
+	}
+
+	/**
+	 * Set weather the code should exit or return
+	 *
+	 *	Default is return
 	 *
 	 * @access public
-	 * @param mixed $table
-	 * @param mixed $sortField (default:id)
+	 * @param bool $exit (default: false)
 	 * @return void
 	 */
-	public function fetch_all_objects ($table=null, $sortField="id") {
-		# null table
-		if(is_null($table)||strlen($table)==0) return false;
-		# fetch
-		try { $res = $this->Database->getObjects($table, $sortField); }
-		catch (Exception $e) {
-			$this->Result->show("danger", _("Error: ").$e->getMessage());
-			return false;
-		}
-		# result
-		return sizeof($res)>0 ? $res : false;
-	}
-
-	/**
-	 * Fetches specified object specified table in database
-	 *
-	 * @access public
-	 * @param mixed $table
-	 * @param mixed $method (default: null)
-	 * @param mixed $id
-	 * @return void
-	 */
-	public function fetch_object ($table=null, $method=null, $id) {
-		# null table
-		if(is_null($table)||strlen($table)==0) return false;
-		# null method
-		$method = is_null($method) ? "id" : $this->Database->escape($method);
-
-		# ignore 0
-		if($id===0 || is_null($id)) {
-			return false;
-		}
-		# check cache
-		elseif(isset($this->table[$table][$method][$id]))	{
-			return $this->table[$table][$method][$id];
-		}
-		else {
-			try { $res = $this->Database->getObjectQuery("SELECT * from `$table` where `$method` = ? limit 1;", array($id)); }
-			catch (Exception $e) {
-				$this->Result->show("danger", _("Error: ").$e->getMessage());
-				return false;
-			}
-			# save to cache array
-			if($res !== null) {
-				$this->table[$table][$method][$id] = (object) $res;
-				return $res;
-			}
-			else {
-				return false;
-			}
-		}
-	}
-
-
-	/**
-	 * Get maxumum number of hosts for netmask
-	 *
-	 * @access public
-	 * @param mixed $netmask
-	 * @param mixed $ipversion
-	 * @param bool $strict (default: true)
-	 * @return void
-	 */
-	public function get_max_hosts ($netmask, $ipversion, $strict=true) {
-		if($ipversion == "IPv4")	{ return $this->get_max_IPv4_hosts ($netmask, $strict); }
-		else						{ return $this->get_max_IPv6_hosts ($netmask, $strict); }
-	}
-
-	/**
-	 * Get max number of IPv4 hosts
-	 *
-	 * @access public
-	 * @param mixed $netmask
-	 * @return void
-	 */
-	public function get_max_IPv4_hosts ($netmask, $strict) {
-		if($netmask==31)			{ return 2; }
-		elseif($netmask==32)		{ return 1; }
-		elseif($strict===false)		{ return (int) pow(2, (32 - $netmask)); }
-		else						{ return (int) pow(2, (32 - $netmask)) -2; }
-	}
-
-	/**
-	 * Get max number of IPv6 hosts
-	 *
-	 * @access public
-	 * @param mixed $netmask
-	 * @return void
-	 */
-	public function get_max_IPv6_hosts ($netmask, $strict) {
-		return gmp_strval(gmp_pow(2, 128 - $netmask));
-	}
-
-	/**
-	 * Parses address
-	 *
-	 * @access public
-	 * @param mixed $address
-	 * @param mixed $netmask
-	 * @return void
-	 */
-	public function get_network_boundaries ($address, $netmask) {
-		# make sure we have dotted format
-		$address = $this->transform_address ($address, "dotted");
-		# set IP version
-		$ipversion = $this->get_ip_version ($address);
-		# return boundaries
-		if($ipversion == "IPv4")	{ return $this->get_IPv4_network_boundaries ($address, $netmask); }
-		else						{ return $this->get_IPv6_network_boundaries ($address, $netmask); }
-	}
-
-	/**
-	 * Returns IPv4 network boundaries
-	 *
-	 *	network, host ip (if not network), broadcast, bitmask, netmask
-	 *
-	 * @access private
-	 * @param mixed $address
-	 * @param mixed $netmask
-	 * @return void
-	 */
-	private function get_IPv4_network_boundaries ($address, $netmask) {
-		# Initialize PEAR NET object
-		$this->initialize_pear_net_IPv4 ();
-		# parse IP address
-		$net = $this->Net_IPv4->parseAddress( $address.'/'.$netmask );
-		# return boundaries
-		return (array) $net;
-	}
-
-	/**
-	 * Returns IPv6 network boundaries
-	 *
-	 *	network, host ip (if not network), broadcast, bitmask, netmask
-	 *
-	 * @access private
-	 * @param mixed $address
-	 * @param mixed $netmask
-	 * @return void
-	 */
-	private function get_IPv6_network_boundaries ($address, $netmask) {
-		# Initialize PEAR NET object
-		$this->initialize_pear_net_IPv6 ();
-		# parse IPv6 subnet
-		$net = $this->Net_IPv6->parseaddress( "$address/$netmask");
-		# set network and masks
-		$out = new StdClass();
-		$out->start		= $net['start'];
-		$out->network 	= $address;
-		$out->netmask 	= $netmask;
-		$out->bitmask 	= $netmask;
-		$out->broadcast = $net['end'];		//highest IP address
-		# result
-		return (array) $out;
-	}
-
-	/**
-	 * Fetches all IP addresses in subnet
-	 *
-	 * @access public
-	 * @param int $subnetId
-	 * @param mixed $order
-	 * @param mixed $order_direction
-	 * @return objects addresses
-	 */
-	public function fetch_subnet_addresses ($subnetId, $order=null, $order_direction=null) {
-		# set order
-		if(!is_null($order)) 	{ $order = array($order, $order_direction); }
-		else 					{ $order = array("ip_addr", "asc"); }
-
-		try { $addresses = $this->Database->getObjectsQuery("SELECT * FROM `ipaddresses` where `subnetId` = ? order by `$order[0]` $order[1];", array($subnetId)); }
-		catch (Exception $e) {
-			$this->Result->show("danger", _("Error: ").$e->getMessage());
-			return false;
-		}
-		# save to addresses cache
-		if(sizeof($addresses)>0) {
-			foreach($addresses as $k=>$address) {
-				# add decimal format
-				$address->ip = $this->transform_to_dotted ($address->ip_addr);
-				# save to subnets
-				$this->addresses[$address->id] = (object) $address;
-				$addresses[$k]->ip = $address->ip;
-			}
-		}
-		# result
-		return sizeof($addresses)>0 ? $addresses : array();
-	}
-
-	/**
-	 * Initializes PEAR Net IPv4 object
-	 *
-	 * @access private
-	 * @return void
-	 */
-	private function initialize_pear_net_IPv4 () {
-		//initialize NET object
-		if(!is_object($this->Net_IPv4)) {
-			require_once( dirname(__FILE__) . '/../../functions/PEAR/Net/IPv4.php' );
-			//initialize object
-			$this->Net_IPv4 = new Net_IPv4();
-		}
-	}
-	/**
-	 * Initializes PEAR Net IPv6 object
-	 *
-	 * @access private
-	 * @return void
-	 */
-	private function initialize_pear_net_IPv6 () {
-		//initialize NET object
-		if(!is_object($this->Net_IPv6)) {
-			require_once( dirname(__FILE__) . '/../../functions/PEAR/Net/IPv6.php' );
-			//initialize object
-			$this->Net_IPv6 = new Net_IPv6();
-		}
+	public function ping_set_exit ($exit = false) {
+		$this->icmp_exit = $exit;
 	}
 
 
@@ -356,7 +255,7 @@ class Scan extends Common_functions {
 		# set method name variable
 		$ping_method = "ping_address_method_".$this->icmp_type;
 		# ping with selected method
-		return $this->$ping_method ($address);
+		return $this->{$ping_method} ($address);
 	}
 
 	/**
@@ -369,17 +268,31 @@ class Scan extends Common_functions {
 	 * @return void
 	 */
 	protected function ping_address_method_ping ($address) {
+		# verify ping path
+		$this->ping_verify_path ($this->settings->scanPingPath);
+
+		# if ipv6 append 6
+		if ($this->identify_address ($address)=="IPv6")	{ $this->settings->scanPingPath = $this->settings->scanPingPath."6"; }
+
 		# set ping command based on OS type
-		if	(PHP_OS == "FreeBSD" || PHP_OS == "NetBSD")                         { $cmd = $this->config->pingpath." -c $this->icmp_count -W ".($this->icmp_timeout*1000)." $address 1>/dev/null 2>&1"; }
-		elseif(PHP_OS == "Linux" || PHP_OS == "OpenBSD")                        { $cmd = $this->config->pingpath." -c $this->icmp_count -w $this->icmp_timeout $address 1>/dev/null 2>&1"; }
-		elseif(PHP_OS == "WIN32" || PHP_OS == "Windows" || PHP_OS == "WINNT")	{ $cmd = $this->config->pingpath." -n $this->icmp_count -I ".($this->icmp_timeout*1000)." $address"; }
-		else																	{ $cmd = $this->config->pingpath." -c $this->icmp_count -n $address 1>/dev/null 2>&1"; }
+		if ($this->os_type == "FreeBSD")    { $cmd = $this->settings->scanPingPath." -c $this->icmp_count -W ".($this->icmp_timeout*1000)." $address 1>/dev/null 2>&1"; }
+		elseif($this->os_type == "Linux")   { $cmd = $this->settings->scanPingPath." -c $this->icmp_count -W $this->icmp_timeout $address 1>/dev/null 2>&1"; }
+		elseif($this->os_type == "Windows")	{ $cmd = $this->settings->scanPingPath." -n $this->icmp_count -w ".($this->icmp_timeout*1000)." $address"; }
+		else								{ $cmd = $this->settings->scanPingPath." -c $this->icmp_count -n $address 1>/dev/null 2>&1"; }
+
+        # for IPv6 remove wait
+        if ($this->identify_address ($address)=="IPv6") {
+            $cmd = explode(" ", $cmd);
+            unset($cmd[3], $cmd[4]);
+            $cmd = implode(" ", $cmd);
+        }
 
 		# execute command, return $retval
 	    exec($cmd, $output, $retval);
 
 		# return result for web or cmd
-		exit ($retval);
+		if($this->icmp_exit)	{ exit  ($retval); }
+		else					{ return $retval; }
 	}
 
 	/**
@@ -394,9 +307,24 @@ class Scan extends Common_functions {
 		require_once(dirname(__FILE__) . '/../../functions/PEAR/Net/Ping.php');
 		$ping = Net_Ping::factory();
 
+		# ipv6 not supported
+		if (!is_object($ping) || $this->identify_address ($address)=="IPv6") {
+    		//return result for web or cmd
+    		if($this->icmp_exit) 	{ exit	(255); }
+    		else	  				{ return 255; }
+		}
+
+		# Check for PEAR_Error
+		if ($ping instanceof PEAR_Error) {
+			//return result for web or cmd
+			if($this->icmp_exit)    { exit ($ping->code); }
+			else                    { return $ping->code; }
+		}
+
 		# check for errors
 		if($ping->pear->isError($ping)) {
-			$this->throw_exception ("Error: ".$ping->getMessage());
+			if($this->icmp_exit)	{ exit  ($ping->getMessage()); }
+			else					{ return $ping->getMessage(); }
 		}
 		else {
 			//set count and timeout
@@ -425,7 +353,8 @@ class Scan extends Common_functions {
 		}
 
 		//return result for web or cmd
-		exit ($result['code']);
+		if($this->icmp_exit) 	{ exit	($result['code']); }
+		else	  				{ return $result['code']; }
 	}
 
 	/**
@@ -445,8 +374,14 @@ class Scan extends Common_functions {
 	 * @return void
 	 */
 	public function ping_address_method_fping ($address) {
+		# verify ping path
+		$this->ping_verify_path ($this->settings->scanFPingPath);
+
+		# if ipv6 append 6
+		if ($this->identify_address ($address)=="IPv6")	{ $this->settings->scanFPingPath = $this->settings->scanFPingPath."6"; }
+
 		# set command
-		$cmd = $this->config->pingpath." -c $this->icmp_count -t ".($this->icmp_timeout*1000)." $address";
+		$cmd = $this->settings->scanFPingPath." -c $this->icmp_count -t ".($this->icmp_timeout*1000)." $address";
 		# execute command, return $retval
 	    exec($cmd, $output, $retval);
 
@@ -456,7 +391,8 @@ class Scan extends Common_functions {
 		}
 
 		# return result for web or cmd
-		exit ($retval);
+		if($this->icmp_exit)	{ exit  ($retval); }
+		else					{ return $retval; }
 	}
 
 	/**
@@ -491,8 +427,10 @@ class Scan extends Common_functions {
 	 * @return void
 	 */
 	public function ping_address_method_fping_subnet ($subnet_cidr, $return_result = false) {
+		# verify ping path
+		$this->ping_verify_path ($this->settings->scanFPingPath);
 		# set command
-		$cmd = $this->config->pingpath." -c $this->icmp_count -t ".($this->icmp_timeout*1000)." -Ag $subnet_cidr";
+		$cmd = $this->settings->scanFPingPath." -c $this->icmp_count -t ".($this->icmp_timeout*1000)." -Ag $subnet_cidr";
 		# execute command, return $retval
 	    exec($cmd, $output, $retval);
 
@@ -511,7 +449,31 @@ class Scan extends Common_functions {
 	    if($return_result)		{ return $out; }
 
 		# return result for web or cmd
-		exit ($retval);
+		if($this->icmp_exit)	{ exit  ($retval); }
+		else					{ return $retval; }
+	}
+
+	/**
+	 * Verifies that ping file exists
+	 *
+	 * @access private
+	 * @param mixed $path
+	 * @return void
+	 */
+	private function ping_verify_path ($path) {
+		// Windows
+		if($this->os_type=="Windows") {
+			if(!file_exists('"'.$path.'"')) {
+				if($this->icmp_exit)	{ exit  ($this->ping_exit_explain(1000)); }
+				else					{ return $this->Result->show("danger", _($this->ping_exit_explain(1000)), true);  }
+			}
+		}
+		else {
+			if(!file_exists($path)) {
+				if($this->icmp_exit)	{ exit  ($this->ping_exit_explain(1000)); }
+				else					{ return $this->Result->show("danger", _($this->ping_exit_explain(1000)), true);  }
+			}
+		}
 	}
 
 	/**
@@ -554,6 +516,8 @@ class Scan extends Common_functions {
 		$explain_codes[74] = "EX_IOERR";
 		$explain_codes[75] = "EX_TEMPFAIL";
 		$explain_codes[77] = "EX_NOPERM";
+		$explain_codes[255] = "EX_NOT_SUPPORTED";
+		$explain_codes[1000] = "Invalid ping path";
 		# return codes
 		return $explain_codes;
 	}
@@ -563,14 +527,135 @@ class Scan extends Common_functions {
 	 *
 	 * @access public
 	 * @param int $id
+	 * @param datetime $datetime
 	 * @return void
 	 */
-	public function ping_update_lastseen ($id) {
+	public function ping_update_lastseen ($id, $datetime = null) {
+    	# set datetime
+    	$datetime = is_null($datetime) ? date("Y-m-d H:i:s") : $datetime;
 		# execute
-		try { $this->Database->updateObject("ipaddresses", array("id"=>$id, "lastSeen"=>$this->nowdate), "id"); }
+		try { $this->Database->updateObject("ipaddresses", array("id"=>$id, "lastSeen"=>$datetime), "id"); }
 		catch (Exception $e) {
-			$this->throw_exception ("Error: ".$e->getMessage());
+			!$this->debugging ? : $this->Result->show("danger", $e->getMessage(), false);
+			# log
+			!$this->debugging ? : $this->Log->write ("status_update", _('Failed to update address status'), 0 );
 		}
+	}
+
+	/**
+	 * Update last check time for agent
+	 *
+	 * @access public
+	 * @param int $id
+	 * @param datetime $date
+	 * @return void
+	 */
+	public function ping_update_scanagent_checktime ($id, $date = false) {
+    	# set time
+    	if ($date === false)    { $date = date("Y-m-d H:i:s"); }
+    	else                    { $date = $date; }
+		# execute
+		try { $this->Database->updateObject("scanAgents", array("id"=>$id, "last_access"=>date("Y-m-d H:i:s")), "id"); }
+		catch (Exception $e) {
+		}
+	}
+
+	/**
+	 * Updates last time that subnet was scanned
+	 *
+	 * @method update_subnet_scantime
+	 * @param  int $subnet_id
+	 * @param  false|datetime $datetime
+	 * @return void
+	 */
+	public function update_subnet_scantime ($subnet_id, $datetime = false) {
+		// set date
+		$datetime = $datetime===false ? date("Y-m-d H:i:s") : $datetime;
+		// update
+		try { $this->Database->updateObject("subnets", array("id"=>$subnet_id, "lastScan"=>$datetime), "id"); }
+		catch (Exception $e) {}
+	}
+
+	/**
+	 * Updates last time discovery check was run on subnet
+	 *
+	 * @method update_subnet_discoverytime
+	 * @param  int $subnet_id
+	 * @param  false|datetime $datetime
+	 * @return void
+	 */
+	public function update_subnet_discoverytime ($subnet_id, $datetime = false) {
+		// set date
+		$datetime = $datetime===false ? date("Y-m-d H:i:s") : $datetime;
+		// update
+		try { $this->Database->updateObject("subnets", array("id"=>$subnet_id, "lastDiscovery"=>$datetime), "id"); }
+		catch (Exception $e) {}
+	}
+
+	/**
+	 * Updates address tag if state changes
+	 *
+	 * @method update_address_tag
+	 * @param  int$address_id
+	 * @param  int $tag_id (default: 2)
+	 * @param  int $old_tag_id (default: null)
+	 * @param  dadtetime $last_seen_date (default: false)
+	 * @return bool
+	 */
+	public function update_address_tag ($address_id, $tag_id = 2, $old_tag_id = null, $last_seen_date = false) {
+		if (is_numeric($address_id)) {
+			// don't update statuses for never seen addresses !
+			if ($last_seen_date!==false && !is_null($last_seen_date) && strlen($last_seen_date)>2 && $last_seen_date!="0000-00-00 00:00:00" && $last_seen_date!="1970-01-01 00:00:01" && $last_seen_date!="1970-01-01 01:00:00") {
+				// dont update reserved to offline
+				if (!($tag_id==1 && $old_tag_id==3)) {
+					try { $this->Database->updateObject("ipaddresses", array("id"=>$address_id, "state"=>$tag_id), "id"); }
+					catch (Exception $e) {
+						return false;
+					}
+				}
+				else {
+					return false;
+				}
+			}
+			else {
+				return false;
+			}
+		}
+		else {
+			return false;
+		}
+		// ok
+		return true;
+	}
+
+	/**
+	 * Opens socket connection on specified TCP ports, if at least one is available host is alive
+	 *
+	 * @access public
+	 * @param mixed $address
+	 * @param mixed $port
+	 * @return void
+	 */
+	public function telnet_address ($address, $port) {
+		# set all ports
+		$ports = explode(",", str_replace(";",",",$port));
+		# default response is dead
+		$retval = 1;
+		//try each port untill one is alive
+		foreach($ports as $p) {
+			// open socket
+			$conn = @fsockopen($address, $p, $errno, $errstr, $this->icmp_timeout);
+			//failed
+			if (!$conn) {}
+			//success
+			else 		{
+				$retval = 0;	//set return as port if alive
+				fclose($conn);
+				break;			//end foreach if success
+			}
+		}
+	    # exit with result
+	    exit($retval);
 	}
 
 
@@ -592,15 +677,16 @@ class Scan extends Common_functions {
 	 * @access public
 	 * @param mixed $type		//discovery, update
 	 * @param mixed $subnet
+	 * @param bool $type
 	 * @return void
 	 */
-	public function prepare_addresses_to_scan ($type, $subnet) {
+	public function prepare_addresses_to_scan ($type, $subnet, $die = true) {
 		# discover new addresses
-		if($type=="discovery") 	{ return is_numeric($subnet) ? $this->prepare_addresses_to_discover_subnetId ($subnet) : $this->prepare_addresses_to_discover_subnet ($subnet); }
+		if($type=="discovery") 	{ return is_numeric($subnet) ? $this->prepare_addresses_to_discover_subnetId ($subnet, $die) : $this->prepare_addresses_to_discover_subnet ($subnet, $die); }
 		# update addresses statuses
 		elseif($type=="update") { return $this->prepare_addresses_to_update ($subnet); }
 		# fail
-		else 					{ $this->throw_exception ("Error: Invalid scan type provided"); }
+		else 					{ die(json_encode(array("status"=>1, "error"=>"Invalid scan type provided"))); }
 	}
 
 	/**
@@ -610,10 +696,21 @@ class Scan extends Common_functions {
 	 * @param mixed $subnetId
 	 * @return void
 	 */
-	public function prepare_addresses_to_discover_subnetId ($subnetId) {
+	public function prepare_addresses_to_discover_subnetId ($subnetId, $die) {
+		# initialize classes
+		$Subnets   = new Subnets ($this->Database);
+
 		//subnet ID is provided, fetch subnet
-		$subnet = $this->fetch_object("subnets", "id", $subnetId);
-		if($subnet===false)										 { $this->throw_exception ("Error: Invalid subnet ID provided"); }
+		$subnet = $Subnets->fetch_subnet(null, $subnetId);
+		if($subnet===false)	{
+			 if ($die)											{ die(json_encode(array("status"=>1, "error"=>"Invalid subnet ID provided"))); }
+			 else												{ return array(); }
+		}
+
+		// we should support only up to 4094 hosts!
+		if($Subnets->max_hosts ($subnet)>4094 && php_sapi_name()!="cli")
+		if ($die)												{ die(json_encode(array("status"=>1, "error"=>"Scanning from GUI is only available for subnets up to /20 or 4094 hosts!"))); }
+		else													{ return array(); }
 
 		# set array of addresses to scan, exclude existing!
 		$ip = $this->get_all_possible_subnet_addresses ($subnet->subnet, $subnet->mask);
@@ -622,7 +719,10 @@ class Scan extends Common_functions {
 		$ip = $this->remove_existing_subnet_addresses ($ip, $subnetId);
 
 		//none to scan?
-		if(sizeof($ip)==0)										 { $this->throw_exception ("Error: Didn't find any address to scan!"); }
+		if(sizeof($ip)==0)	{
+			if ($die)											{ die(json_encode(array("status"=>1, "error"=>"Didn't find any address to scan!"))); }
+			else												{ return array(); }
+		}
 
 		//return
 		return $ip;
@@ -637,22 +737,24 @@ class Scan extends Common_functions {
 	 * @return void			//array of ip addresses in decimal format
 	 */
 	private function get_all_possible_subnet_addresses ($subnet, $mask) {
+		# initialize classes
+		$Subnets   = new Subnets ($this->Database);
 		# make sure we have proper subnet format
-		$subnet    = $this->transform_address($subnet, "decimal");
+		$subnet    = $Subnets->transform_address($subnet, "decimal");
 		//fetch start and stop addresses
-		$boundaries = (object) $this->get_network_boundaries ($subnet, $mask);
+		$boundaries = (object) $Subnets->get_network_boundaries ($subnet, $mask);
 		//create array
 		if($mask==32) {
-			$ip[] = $this->transform_to_decimal($boundaries->network);
+			$ip[] = $Subnets->transform_to_decimal($boundaries->network);
 		}
 		elseif($mask==31) {
-			$ip[] = $this->transform_to_decimal($boundaries->network);
-			$ip[] = $this->transform_to_decimal($boundaries->broadcast);
+			$ip[] = $Subnets->transform_to_decimal($boundaries->network);
+			$ip[] = $Subnets->transform_to_decimal($boundaries->broadcast);
 		}
 		else {
 			//set loop limits
-			$start = $this->transform_to_decimal($boundaries->network)+1;
-			$stop  = $this->transform_to_decimal($boundaries->broadcast);
+			$start = gmp_strval(gmp_add($Subnets->transform_to_decimal($boundaries->network),1));
+			$stop  = gmp_strval($Subnets->transform_to_decimal($boundaries->broadcast));
 			//loop
 			for($m=$start; $m<$stop; $m++) {
 				$ip[] = $m;
@@ -671,10 +773,12 @@ class Scan extends Common_functions {
 	 * @return void
 	 */
 	private function remove_existing_subnet_addresses ($ip, $subnetId) {
+		# first fetch all addresses
+		$Addresses = new Addresses ($this->Database);
 		// get all existing IP addresses in subnet
-		$addresses  = $this->fetch_subnet_addresses($subnetId);
+		$addresses  = $Addresses->fetch_subnet_addresses($subnetId);
 		// if some exist remove them
-		if(sizeof($addresses)>0 && sizeof(@$ip)>0) {
+		if(is_array($addresses) && is_array($ip) && sizeof($ip)>0) {
 			foreach($addresses as $a) {
 				$key = array_search($a->ip_addr, $ip);
 				if($key !== false) {
@@ -701,7 +805,7 @@ class Scan extends Common_functions {
 		# result
 		$ip = $this->get_all_possible_subnet_addresses ($subnet_parsed[0], $subnet_parsed[1]);
 		//none to scan?
-		if(sizeof($ip)==0)									{ $this->throw_exception ("Error: Didn't find any address to scan!"); }
+		if(sizeof($ip)==0)									{ die(json_encode(array("status"=>1, "error"=>"Didn't find any address to scan!"))); }
 		//result
 		return $ip;
 	}
@@ -714,10 +818,12 @@ class Scan extends Common_functions {
 	 * @return void
 	 */
 	public function prepare_addresses_to_update ($subnetId) {
+		# first fetch all addresses
+		$Addresses = new Addresses ($this->Database);
 		// get all existing IP addresses in subnet
-		$subnet_addresses = $this->fetch_subnet_addresses($subnetId);
+		$subnet_addresses = $Addresses->fetch_subnet_addresses($subnetId);
 		//create array
-		if(sizeof($subnet_addresses)>0) {
+		if(is_array($subnet_addresses) && sizeof($subnet_addresses)>0) {
 			foreach($subnet_addresses as $a) {
 				$scan_addresses[$a->id] = $a->ip_addr;
 			}
@@ -730,19 +836,11 @@ class Scan extends Common_functions {
 			return array();
 		}
 	}
-
-
 }
-
-
-
-
-
 
 
 /**
  *	@scan helper functions
- *		fir threading
  * ------------------------
  */
 
@@ -756,7 +854,9 @@ class Scan extends Common_functions {
  *		- icmp discovery (cli)
  */
 function ping_address ($address) {
-	global $Scan;
+//	$Database = new Database_PDO;
+//	$Scan = new Scan ($Database);
+ 	global $Scan;
 	//scan
 	return $Scan->ping_address ($address);
 }

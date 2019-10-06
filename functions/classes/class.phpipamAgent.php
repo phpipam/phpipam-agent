@@ -164,8 +164,11 @@ class phpipamAgent extends Common_functions {
 	 * @return void
 	 */
 	public function __construct ($Database) {
+		parent::__construct();
+		// Result
+		$this->Result = new Result ();
 		// read config file
-		$this->read_config ();
+		$this->config = (object) Config::ValueOf('config');
 		// set time
 		$this->set_now_time ();
 		// set valid connection types
@@ -251,7 +254,7 @@ class phpipamAgent extends Common_functions {
 	private function validate_conn_type () {
 		//validate
 		if (!in_array($this->config->type, $this->conn_types)) {
-			$this->throw_exception ("Invalid connection type!");
+			$this->Result->throw_exception (500, "Invalid connection type!");
 		}
 	}
 
@@ -278,7 +281,7 @@ class phpipamAgent extends Common_functions {
 	public function set_scan_type ($type) {
 		//validate
 		if (!in_array($type,$this->scan_types)) {
-			$this->throw_exception ("Invalid scan type - $type! Valid options are ".implode(", ", $this->scan_types));
+			$this->Result->throw_exception (500, "Invalid scan type - $type! Valid options are ".implode(", ", $this->scan_types));
 		}
 		// ok, save
 		$this->scan_type = $type;
@@ -293,7 +296,7 @@ class phpipamAgent extends Common_functions {
 	public function set_ping_type () {
 		//validate
 		if (!in_array($this->config->method, $this->ping_types)) {
-			$this->throw_exception ("Invalid ping type - $this->ping_type!");
+			$this->Result->throw_exception (500, "Invalid ping type - $this->ping_type!");
 		}
 		// ok, save
 		$this->ping_type = $this->config->method;
@@ -326,7 +329,7 @@ class phpipamAgent extends Common_functions {
 		    $error[] = "Please recompile PHP to include missing extensions.";
 
 			// die
-		    $this->throw_exception ($error);
+		    $this->Result->throw_exception (500, $error);
 		}
 	}
 
@@ -339,8 +342,9 @@ class phpipamAgent extends Common_functions {
 	private function validate_threading () {
 		// only for threaded
 		if($this->config->nonthreaded !== true) {
-			if(!Thread::available()) {
-				$this->throw_exception ("Threading is required for scanning subnets. Please recompile PHP with pcntl extension");
+			// test to see if threading is available
+			if(!PingThread::available($errmsg)) {
+				$this->Result->throw_exception (500, "Threading is required for scanning subnets - Error: $errmsg\n");
 			}
 		}
 	}
@@ -353,7 +357,7 @@ class phpipamAgent extends Common_functions {
 	 */
 	private function validate_ping_path () {
 		if(!file_exists($this->config->pingpath)) {
-			$this->throw_exception ("Invalid ping path!");
+			$this->Result->throw_exception (500, "Invalid ping path!");
 		}
 	}
 
@@ -479,7 +483,7 @@ class phpipamAgent extends Common_functions {
 	 * @return void
 	 */
 	private function initialize_api () {
-		$this->throw_exception ("API agent type not yet supported!");
+		$this->Result->throw_exception (500, "API agent type not yet supported!");
 	}
 
 
@@ -540,11 +544,11 @@ class phpipamAgent extends Common_functions {
 		// fetch details
 		try { $agent = $this->Database->getObjectQuery("select * from `scanAgents` where `code` = ? and `type` = 'mysql' limit 1;", array($this->config->key)); }
 		catch (Exception $e) {
-			$this->throw_exception ("Error: ".$e->getMessage());
+			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 		}
 		// invalid
 		if (is_null($agent)) {
-			$this->throw_exception ("Error: Invalid agent code");
+			$this->Result->throw_exception (500, "Error: Invalid agent code");
 		}
 		// save agent details
 		else {
@@ -562,7 +566,7 @@ class phpipamAgent extends Common_functions {
 		// update access time
 		try { $agent = $this->Database->runQuery("update `scanAgents` set `last_access` = ? where `id` = ? limit 1;", array($this->nowdate, $this->agent_details->id)); }
 		catch (Exception $e) {
-			$this->throw_exception ("Error: ".$e->getMessage());
+			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 		}
 	}
 
@@ -576,7 +580,7 @@ class phpipamAgent extends Common_functions {
 		# fetch
 		try { $settings = $this->Database->getObject("settings", 1); }
 		catch (Exception $e) {
-			$this->throw_exception ("Error: ".$e->getMessage());
+			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 		}
 		# save
 		$this->settings = $settings;
@@ -596,7 +600,7 @@ class phpipamAgent extends Common_functions {
 		$addresses = $this->mysql_fetch_addresses ($subnets, "update");
 		// save existing and reindexed
 		$addresses_tmp = $addresses[0];
-		$addresses 	   = $addresses[1];
+		$addresses 	   = (array) $addresses[1];
 
 		// non-threaded?
 		if ($this->config->nonthreaded === true) {
@@ -691,9 +695,9 @@ class phpipamAgent extends Common_functions {
 		# get type
 		$type = $this->get_scan_type_field ();
 		# fetch
-		try { $subnets = $this->Database->getObjectsQuery("SELECT `id`,`subnet`,`sectionId`,`mask` FROM `subnets` where `scanAgent` = ? and `$type` = 1 and `isFolder`= 0 and `mask` > '0' and subnet > 16843009;", array($agentId)); }
+		try { $subnets = $this->Database->getObjectsQuery("SELECT `id`,`subnet`,`sectionId`,`mask`,`resolveDNS`,`nameserverId` FROM `subnets` WHERE `scanAgent` = ? AND `$type` = 1 AND `isFolder` = 0 AND `mask` > 0;", array($agentId)); }
 		catch (Exception $e) {
-			$this->throw_exception ("Error: ".$e->getMessage());
+			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 		}
 		# die if nothing to scan
 		if (sizeof($subnets)==0)	{ die(); }
@@ -783,15 +787,15 @@ class phpipamAgent extends Common_functions {
 		$z = 0;			//addresses array index
 
 		//run per MAX_THREADS
-		for ($m=0; $m<=sizeof($subnets); $m += $this->config->threads) {
+		for ($m=0; $m<sizeof($subnets); $m += $this->config->threads) {
 		    // create threads
 		    $threads = array();
 		    //fork processes
-		    for ($i = 0; $i <= $this->config->threads && $i <= sizeof($subnets); $i++) {
+		    for ($i = 0; $i < $this->config->threads; $i++) {
 		    	//only if index exists!
 		    	if(isset($subnets[$z])) {
 					//start new thread
-		            $threads[$z] = new Thread( 'fping_subnet' );
+		            $threads[$z] = new PingThread( 'fping_subnet' );
 					$threads[$z]->start_fping( $this->transform_to_dotted($subnets[$z]->subnet)."/".$subnets[$z]->mask );
 				}
 	            $z++;				//next index
@@ -816,13 +820,12 @@ class phpipamAgent extends Common_functions {
 						unset($threads[$index]);
 					}
 				}
-		        usleep(200000);
 		    }
 		}
 
 		//fping finds all subnet addresses, we must remove existing ones !
 		foreach($subnets as $sk=>$s) {
-			if (isset($s->discovered)) {
+			if (is_array($s->discovered)) {
 				foreach($s->discovered as $rk=>$result) {
 					if(!in_array($this->transform_to_decimal($result), $addresses_tmp[$s->id])) {
 						unset($subnets[$sk]->discovered[$rk]);
@@ -850,35 +853,34 @@ class phpipamAgent extends Common_functions {
 
 		//run per MAX_THREADS
         $num_of_addresses = sizeof($addresses);
-        for ($m=0; $m<=$num_of_addresses; $m += $this->config->threads) {
+        for ($m=0; $m<$num_of_addresses; $m += $this->config->threads) {
 
 	        // create threads
 	        $threads = array();
 
 	        //fork processes
-	        for ($i = 0; $i <= $this->config->threads && $i <= sizeof($addresses); $i++) {
+	        for ($i = 0; $i < $this->config->threads; $i++) {
 	        	//only if index exists!
 	        	if(isset($addresses[$z])) {
 					//start new thread
-		            $threads[$z] = new Thread( 'ping_address' );
+		            $threads[$z] = new PingThread( 'ping_address' );
 		            $threads[$z]->start( $this->transform_to_dotted( $addresses[$z]['ip_addr']) );
-					$z++;			//next index
 				}
+				$z++;			//next index
 	        }
 
 	        // wait for all the threads to finish
 	        while( !empty( $threads ) ) {
 	            foreach( $threads as $index => $thread ) {
-	                if( ! $thread->isAlive() ) {
+	                if( !$thread->isAlive() ) {
 						//unset dead hosts
 						if($thread->getExitCode() != 0) {
 							unset($addresses[$index]);
 						}
 	                    //remove thread
-	                    unset( $threads[$index]);
+	                    unset($threads[$index]);
 	                }
 	            }
-	            usleep(200000);
 	        }
 		}
 
@@ -927,7 +929,7 @@ class phpipamAgent extends Common_functions {
 		    	//only if index exists!
 		    	if(isset($subnets[$z])) {
 					//start new thread
-		            $threads[$z] = new Thread( 'fping_subnet' );
+		            $threads[$z] = new PingThread( 'fping_subnet' );
 					$threads[$z]->start_fping( $this->transform_to_dotted($subnets[$z]->subnet)."/".$subnets[$z]->mask );
 		            $z++;				//next index
 				}
@@ -958,7 +960,7 @@ class phpipamAgent extends Common_functions {
 
 		//fping finds all subnet addresses, we must remove existing ones !
 		foreach($subnets as $sk=>$s) {
-			if (isset($s->discovered)) {
+			if (is_array($s->discovered)) {
 				foreach($s->discovered as $rk=>$result) {
 					if(!in_array($this->transform_to_decimal($result), $addresses_tmp[$s->id])) {
 						unset($subnets[$sk]->discovered[$rk]);
@@ -1023,7 +1025,7 @@ class phpipamAgent extends Common_functions {
 		}
 		// loop
 		foreach($subnets as $s) {
-			if(sizeof(@$s->discovered)>0) {
+			if(is_array($s->discovered)) {
 				foreach($s->discovered as $ip) {
 					// try to resolve hostname
 					$tmp = new stdClass();
@@ -1067,7 +1069,7 @@ class phpipamAgent extends Common_functions {
 		# execute
 		try { $this->Database->insertObject("ipaddresses", $insert); }
 		catch (Exception $e) {
-			$this->throw_exception ("Error: ".$e->getMessage());
+			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 			return false;
 		}
 		# ok
@@ -1089,7 +1091,7 @@ class phpipamAgent extends Common_functions {
 		}
 		// loop
 		foreach ($subnets as $s) {
-			if (sizeof($s->discovered)>0) {
+			if (is_array($s->discovered)) {
 				foreach ($s->discovered as $ip) {
 					# execute
 					$query = "update `ipaddresses` set `lastSeen` = ? where `subnetId` = ? and `ip_addr` = ? limit 1;";
@@ -1097,7 +1099,7 @@ class phpipamAgent extends Common_functions {
 
 					try { $this->Database->runQuery($query, $vars); }
 					catch (Exception $e) {
-						$this->throw_exception("Error: ".$e->getMessage());
+						$this->Result->throw_exception(500, "Error: ".$e->getMessage());
 					}
 				}
 			}
@@ -1124,7 +1126,7 @@ class phpipamAgent extends Common_functions {
 		// fetch details
                 try { $DHCPAddresses = $this->Database->getObjectsQuery($query, $vars); }
 		catch (Exception $e) {
-		$this->throw_exception ("Error: ".$e->getMessage());
+		$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 		}
 
 		# Get Warning and Offline time
@@ -1133,7 +1135,7 @@ class phpipamAgent extends Common_functions {
 		// fetch details
                 try { $statuses = $this->Database->getObjectsQuery($query); }
                 catch (Exception $e) {
-                $this->throw_exception ("Error: ".$e->getMessage());
+                $this->Result->throw_exception (500, "Error: ".$e->getMessage());
                 }
 
 		# Convert stdClass Objects to arrays
@@ -1152,7 +1154,7 @@ class phpipamAgent extends Common_functions {
 
 				try { $this->Database->runQuery($query, $vars); }
 				catch (Exception $e) {
-					$this->throw_exception("Error: ".$e->getMessage());
+					$this->Result->throw_exception(500, "Error: ".$e->getMessage());
 				}
 			}
 		}
@@ -1178,7 +1180,7 @@ class phpipamAgent extends Common_functions {
 		// fetch details
         try { $AutoDiscAddresses = $this->Database->getObjectsQuery($query, $vars); }
 		catch (Exception $e) {
-			$this->throw_exception ("Error: ".$e->getMessage());
+			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 		}
 
 		# Get Warning and Offline time
@@ -1187,7 +1189,7 @@ class phpipamAgent extends Common_functions {
 		// fetch details
         try { $statuses = $this->Database->getObjectsQuery($query); }
         catch (Exception $e) {
-        	$this->throw_exception ("Error: ".$e->getMessage());
+        	$this->Result->throw_exception (500, "Error: ".$e->getMessage());
         }
 
 		# Convert stdClass Objects to arrays
@@ -1206,7 +1208,7 @@ class phpipamAgent extends Common_functions {
 
 		        try { $this->Database->deleteRow("ipaddresses", $field, $value, $field2, $value2); }
 				catch (Exception $e) {
-                		$this->throw_exception ("Error: ".$e->getMessage());
+                		$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 		        }
 			}
 		}
@@ -1227,7 +1229,7 @@ class phpipamAgent extends Common_functions {
 	private function get_scan_type_field () {
 		if ($this->scan_type == "update")			{ return "pingSubnet"; }
 		elseif ($this->scan_type == "discover")		{ return "discoverSubnet"; }
-		else 										{ $this->throw_exception ("Invalid scan type!"); }
+		else 										{ $this->Result->throw_exception (500, "Invalid scan type!"); }
 	}
 
 

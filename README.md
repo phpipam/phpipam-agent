@@ -1,7 +1,7 @@
 ## Description
 phpipam-agent is a scanning agent for phpipam server to be deployed to remote servers
 
-## License
+## License8
 phpipam is released under the GPL v3 license, see misc/gpl-3.0.txt.
 
 ## Requirements
@@ -35,7 +35,7 @@ Just run index.php script with discover or update as argument.
 
 ```
 cd phpipam-agent
-git update
+git pull
 git submodule update --init --recursive
 ```
 

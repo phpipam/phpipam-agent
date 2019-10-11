@@ -5,7 +5,7 @@ phpipam-agent is a scanning agent for phpipam server to be deployed to remote se
 phpipam is released under the GPL v3 license, see misc/gpl-3.0.txt.
 
 ## Requirements
- - PHP version 5.3+ with following modules
+ - 64bit PHP version 5.4+ with following modules
     - pdo, pdo_mysql : Adds support for mysql connections (if type=mysql)
     - gmp            : Adds support for dev-libs/gmp (GNU MP library) -> to calculate IPv6 networks
     - json           : Adds supports for JSON data-interexchange format

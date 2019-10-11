@@ -1,5 +1,7 @@
 <?php
 
+require( dirname(__FILE__) .  '/checks/check_php_build.php' );
+
 /* @config file ------------------ */
 require_once( dirname(__FILE__) . '/classes/class.Config.php' );
 $config = Config::ValueOf('config');

@@ -296,7 +296,7 @@ class phpipamAgent extends Common_functions {
 	public function set_ping_type () {
 		//validate
 		if (!in_array($this->config->method, $this->ping_types)) {
-			$this->Result->throw_exception (500, "Invalid ping type - $this->ping_type!");
+			$this->Result->throw_exception (500, "Invalid ping method - \$config['method'] = \"".escape_input($this->config->method)."\"");
 		}
 		// ok, save
 		$this->ping_type = $this->config->method;
@@ -357,7 +357,7 @@ class phpipamAgent extends Common_functions {
 	 */
 	private function validate_ping_path () {
 		if(!file_exists($this->config->pingpath)) {
-			$this->Result->throw_exception (500, "Invalid ping path!");
+			$this->Result->throw_exception (500, "ping executable does not exist - \$config['pingpath'] = \"".escape_input($this->config->pingpath)."\"");
 		}
 	}
 

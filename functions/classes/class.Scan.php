@@ -435,7 +435,7 @@ class Scan extends Common_functions {
 	 */
 	public function ping_address_method_fping_subnet ($subnet_cidr, $return_result = false) {
 		# if ipv6 append 6
-		$fping_path = ($this->identify_address ($address)=="IPv6") ? $this->fping_path."6" : $this->fping_path;
+		$fping_path = ($this->identify_address ($subnet_cidr)=="IPv6") ? $this->fping_path."6" : $this->fping_path;
 
 		# verify ping path
 		$this->ping_verify_path ($fping_path);

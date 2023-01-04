@@ -7,6 +7,14 @@
 class Subnets extends Common_functions {
 
 	/**
+	 * (array) Discovered IP addresses
+	 *
+	 * @var mixed
+	 * @access public
+	 */
+	public $discovered = array();
+
+	/**
 	 * (array of ids) to store id's of all recursively slaves
 	 *
 	 * @var mixed

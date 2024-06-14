@@ -372,7 +372,7 @@ class phpipamAgent extends Common_functions {
 		$required_ext = array("gmp", "json", "pcntl");
 
 		// if mysql selected
-		if ($this->type=="mysql") {
+		if ($this->config->type=="mysql") {
 			$required_ext = array_merge($required_ext, array("PDO", "pdo_mysql"));
 		}
 		// if non-threaded permitted remove pcntl requirement
@@ -1085,7 +1085,7 @@ class phpipamAgent extends Common_functions {
 	 */
 	private function mysql_scan_update_write_to_db ($subnets) {
 		# reset db connection for ping / pear
-		if ($this->can_type!=="fping") {
+		if ($this->scan_type!=="fping") {
 			unset($this->Database);
 			$this->Database = new Database_PDO ();
 		}

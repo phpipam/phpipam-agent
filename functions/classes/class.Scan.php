@@ -448,8 +448,10 @@ class Scan extends Common_functions {
 	    # save result
 	    if(sizeof($output)>0) {
 	    	foreach($output as $line) {
+if (!preg_match('/timed out/', $line)) {
 		    	$tmp = explode(" ",$line);
 		    	$out[] = $tmp[0];
+					}
 	    	}
 	    }
 

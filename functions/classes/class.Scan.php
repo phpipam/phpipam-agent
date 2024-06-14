@@ -726,6 +726,9 @@ class Scan extends Common_functions {
 		# set array of addresses to scan, exclude existing!
 		$ip = $this->get_all_possible_subnet_addresses ($subnet->subnet, $subnet->mask);
 
+		# remove excluded
+		$ip = $this->remove_excluded_subnet_addresses ($ip, $subnetId);
+
 		# remove existing
 		$ip = $this->remove_existing_subnet_addresses ($ip, $subnetId);
 
@@ -773,6 +776,34 @@ class Scan extends Common_functions {
 		}
 		//return
 		return $ip;
+	}
+
+	/**
+   * Removes excluded addresses from
+   *
+   * @access private
+   * @param mixed $ip       //array of ip addresses in decimal format
+   * @param mixed $subnetId   //id of subnet
+   * @return void
+   */
+  private function remove_excluded_subnet_addresses ($ip, $subnetId) {
+    # first fetch all addresses
+    $Addresses = new Addresses ($this->Database);
+    // get all existing IP addresses in subnet
+    $addresses  = $Addresses->fetch_subnet_addresses($subnetId);
+    // if some exist remove them
+    if(is_array($addresses) && is_array($ip) && sizeof($ip)>0) {
+      foreach($addresses as $a) {
+        if( $a->excludePing === 1) {
+        	$key = array_search($a->ip_addr, $ip);
+          unset($ip[$key]);
+        }
+      }
+      //reindex array for pinging
+      $ip = array_values(@$ip);
+    }
+    //return
+    return is_array(@$ip) ? $ip : array();
 	}
 
 	/**

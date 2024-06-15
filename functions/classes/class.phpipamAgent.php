@@ -372,7 +372,7 @@ class phpipamAgent extends Common_functions {
 		$required_ext = array("gmp", "json", "pcntl");
 
 		// if mysql selected
-		if ($this->type=="mysql") {
+		if ($this->config->type=="mysql") {
 			$required_ext = array_merge($required_ext, array("PDO", "pdo_mysql"));
 		}
 		// if non-threaded permitted remove pcntl requirement
@@ -987,7 +987,7 @@ class phpipamAgent extends Common_functions {
 	private function mysql_scan_discover_hosts_ping_nonthreaded ($subnets, $addresses) {
 
 		for ($i = 0; $i <= sizeof($addresses); $i++) {
-			ping_address( $this->transform_to_dotted( $addresses[$z]['ip_addr']) );
+			ping_address( $this->transform_to_dotted( $addresses[$i]['ip_addr']) );
 		}
 
 		//ok, we have all available addresses, rekey them

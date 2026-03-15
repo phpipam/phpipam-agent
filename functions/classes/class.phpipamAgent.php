@@ -1027,10 +1027,43 @@ class phpipamAgent extends Common_functions {
 			unset($this->Database);
 			$this->Database = new Database_PDO ();
 		}
+		// Try to load kernel ARP table into an array
+		$arp = [];
+		$arpFile = "/proc/net/arp";
+		if (file_exists($arpFile)) {
+			if ($handle = fopen($arpFile, "r")) {
+				// Skip the header line
+				fgets($handle);
+				// Loop through each line
+				while (($line = fgets($handle)) !== false) {
+					if (sscanf($line, "%s %*s %*s %s %*s %s", $ip, $mac, $int) === 6) {
+						// Proc ARP table includes blank values for hosts that did not respond, filter those out
+						if ($mac !== "00:00:00:00:00:00") {
+							$arp["$ip"] = [
+								"mac" => $mac,
+								"int" => $int
+							];
+						}
+					}
+				}
+				fclose($handle);
+			}
+		}
 		// loop
 		foreach($subnets as $s) {
 			if (isset($s->discovered) && is_array($s->discovered)) {
 				foreach($s->discovered as $ip) {
+					// Check kernel arp table array for a matching entry
+					// Move note text processing here so we can add the interface
+					$note = "This host was autodiscovered on ".$this->nowdate. " by agent ".$this->agent_details->name;
+					// If we have discovered a MAC address, add it and append to the note identifying the interface
+					if (array_key_exists($ip, $arp)) {
+						$mac = $this->reformat_mac_address ($arp["$ip"]["mac"]);
+						$note .= " on interface ".$arp["$ip"]["int"];
+					} else {
+						// Define an empty MAC so DB insert does not error if no match
+						$mac = null;
+					}
 					// try to resolve hostname
 					$tmp = new stdClass();
 					$tmp->ip_addr = $ip;
@@ -1039,8 +1072,9 @@ class phpipamAgent extends Common_functions {
 					$values = array("subnetId"=>$s->id,
 									"ip_addr"=>$this->transform_address($ip, "decimal"),
 									"hostname"=>$hostname['name'],
+									"mac"=>$mac,
 									"description"=>"-- autodiscovered --",
-									"note"=>"This host was autodiscovered on ".$this->nowdate. " by agent ".$this->agent_details->name,
+									"note"=>$note,
 									"lastSeen"=>$this->nowdate,
 									"state"=>"2"
 									);

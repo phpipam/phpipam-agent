@@ -733,7 +733,7 @@ class phpipamAgent extends Common_functions {
 		foreach($subnets as $s) {
 			// if subnet has slaves dont check it
 			if ($this->mysql_check_slaves ($s->id) === false) {
-				$addresses_tmp[$s->id] = $this->Scan->prepare_addresses_to_scan ($type, $s->id);
+				$addresses_tmp[$s->id] = $this->Scan->prepare_addresses_to_scan ($type, $s->id, false);
 			}
 		}
 		// if false exit

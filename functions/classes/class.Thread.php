@@ -37,6 +37,13 @@ class PingThread {
     private $pid;
 
 	/**
+	* holds the parent process id (child only)
+	*
+	* @var integer
+	*/
+    private $ppid;
+
+	/**
 	* holds the exit code after the child dies
 	*/
     private $exitCode = -1;

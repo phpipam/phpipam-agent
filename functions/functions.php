@@ -35,7 +35,7 @@ if(php_sapi_name()!="cli")
 if(Config::ValueOf('debugging')==true) {
 	ini_set('display_errors', 1);
 	ini_set('display_startup_errors', 1);
-	error_reporting(E_ALL ^ E_NOTICE ^ E_STRICT);
+	error_reporting(E_ALL & ~E_NOTICE);
 }
 else {
 	ini_set('display_errors', 0);

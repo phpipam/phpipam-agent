@@ -5,6 +5,7 @@
  *
  * @abstract
  */
+#[\AllowDynamicProperties]
 abstract class DB {
 
 
@@ -47,6 +48,14 @@ abstract class DB {
 	 * @access protected
 	 */
 	protected $pdo = null;
+
+	/**
+	 * SSL options (false or array of PDO attributes)
+	 *
+	 * @var bool|array
+	 * @access protected
+	 */
+	protected $ssl = false;
 
 	/**
 	 * Database name - needed for check
@@ -1029,17 +1038,17 @@ class Database_PDO extends DB {
 		if (@$db['ssl']===true) {
 
 			$this->pdo_ssl_opts = array (
-				'ssl_key'    => PDO::MYSQL_ATTR_SSL_KEY,
-				'ssl_cert'   => PDO::MYSQL_ATTR_SSL_CERT,
-				'ssl_ca'     => PDO::MYSQL_ATTR_SSL_CA,
-				'ssl_cipher' => PDO::MYSQL_ATTR_SSL_CIPHER,
-				'ssl_capath' => PDO::MYSQL_ATTR_SSL_CAPATH
+				'ssl_key'    => $this->mysql_attr('SSL_KEY'),
+				'ssl_cert'   => $this->mysql_attr('SSL_CERT'),
+				'ssl_ca'     => $this->mysql_attr('SSL_CA'),
+				'ssl_cipher' => $this->mysql_attr('SSL_CIPHER'),
+				'ssl_capath' => $this->mysql_attr('SSL_CAPATH')
 			);
 
 			$this->ssl = array();
 
-			if ($db['ssl_verify']===false) {
-				$this->ssl[PDO::MYSQL_ATTR_SSL_VERIFY_SERVER_CERT] = false;
+			if (isset($db['ssl_verify']) && $db['ssl_verify']===false) {
+				$this->ssl[$this->mysql_attr('SSL_VERIFY_SERVER_CERT')] = false;
 			}
 
 			$db += [
@@ -1057,6 +1066,19 @@ class Database_PDO extends DB {
 
 		}
 
+	}
+
+	/**
+	 * Returns pdo_mysql attribute constant
+	 *
+	 *	PHP 8.4+ provides Pdo\Mysql::ATTR_*, PDO::MYSQL_ATTR_* is deprecated in PHP 8.5
+	 *
+	 * @access private
+	 * @param string $name		//e.g. SSL_KEY
+	 * @return int
+	 */
+	private function mysql_attr ($name) {
+		return class_exists('Pdo\Mysql') ? constant('Pdo\Mysql::ATTR_'.$name) : constant('PDO::MYSQL_ATTR_'.$name);
 	}
 
 	/**

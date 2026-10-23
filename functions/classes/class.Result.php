@@ -11,6 +11,7 @@
  *
  */
 
+#[\AllowDynamicProperties]
 class Result {
 
 	/**
@@ -238,7 +239,7 @@ class Result {
 	 * @param mixed $exception
 	 * @return void
 	 */
-	public function throw_exception ($code = 500, $exception) {
+	public function throw_exception ($code, $exception) {
 		// set failed
 		$this->exception = true;
 

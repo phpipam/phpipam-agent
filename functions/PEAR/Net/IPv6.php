@@ -835,7 +835,7 @@ class Net_IPv6
             	return array("", $ip);
             }
 
-            $ip{$pos} = '_';
+            $ip[$pos] = '_';
             $ipPart   = explode('_', $ip);
 
             return $ipPart;
@@ -919,7 +919,7 @@ class Net_IPv6
 
                 for ($i = 0; $i < count($ipv4); $i++) {
 
-                    if ($ipv4[$i] >= 0 && (integer)$ipv4[$i] <= 255
+                    if ($ipv4[$i] >= 0 && (int)$ipv4[$i] <= 255
                         && preg_match("/^\d{1,3}$/", $ipv4[$i])) {
 
                         $count++;

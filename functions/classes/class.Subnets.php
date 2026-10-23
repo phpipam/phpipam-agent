@@ -528,7 +528,7 @@ class Subnets extends Common_functions {
 	 * @param mixed $value
 	 * @return array|false
 	 */
-	public function fetch_subnet ($method="id", $value) {
+	public function fetch_subnet ($method, $value) {
 		# null method
 		$method = is_null($method) ? "id" : $method;
 		# fetch
@@ -1483,7 +1483,7 @@ class Subnets extends Common_functions {
 		$subnet = (object) $subnet;
 
 		# Address/NAT pools
-		if ($subnet->isPool)
+		if (!empty($subnet->isPool))
 			return false;
 
 		# IPv4/IPv6 networks
@@ -3555,7 +3555,7 @@ class Subnets extends Common_functions {
 	 * @param mixed $subnet
 	 * @return array
 	 */
-	private function ripe_arin_fetch ($network = "ripe", $type = "inetnum", $subnet) {
+	private function ripe_arin_fetch ($network, $type, $subnet) {
 		// set url
 		$url = $network=="ripe" ? "http://rest.db.ripe.net/ripe/$type/$subnet" : "http://whois.arin.net/rest/nets;q=$subnet?showDetails=true&showARIN=false&showNonArinTopLevelNet=false&ext=netref2";
 

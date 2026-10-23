@@ -38,7 +38,7 @@ if ((@include_once 'PEAR.php') != true) {
 }
 
 # if any extension is missing print error and die!
-if (sizeof($missingExt) != 1 || (phpversion() < "5.4") || PHP_INT_SIZE==4) {
+if (sizeof($missingExt) != 1 || version_compare(PHP_VERSION, "5.4", "<") || PHP_INT_SIZE==4) {
 
     /* remove dummy 0 line */
     unset($missingExt[0]);
@@ -52,7 +52,7 @@ if (sizeof($missingExt) != 1 || (phpversion() < "5.4") || PHP_INT_SIZE==4) {
         $error[] = _('Please recompile PHP to include missing extensions.');
     }
     /* php version error */
-    elseif(phpversion() < "5.4") {
+    elseif(version_compare(PHP_VERSION, "5.4", "<")) {
         $error[] = _('Unsupported PHP version');
         $error[] = _('From release 1.3.2+, at least PHP version 5.4 is required!');
         $error[] = _("Detected PHP version: ").phpversion();

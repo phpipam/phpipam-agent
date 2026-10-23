@@ -5,6 +5,7 @@
  *
  * @author: Miha Petkovsek <miha.petkovsek@gmail.com>
  */
+#[\AllowDynamicProperties]
 class Common_functions  {
 
 	/**
@@ -219,7 +220,7 @@ class Common_functions  {
 	 * @param mixed $value
 	 * @return false|object
 	 */
-	public function fetch_object ($table=null, $method=null, $value) {
+	public function fetch_object ($table, $method, $value) {
 		// checks
 		if(!is_string($table)) return false;
 		if(strlen($table)==0)  return false;

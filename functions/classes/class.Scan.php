@@ -95,6 +95,18 @@ class Scan extends Common_functions {
 	 */
 	protected $Addresses;
 
+	/**
+	 * ping method, paths and last results
+	 *
+	 * @var mixed
+	 * @access public
+	 */
+	public $ping_type = null;
+	public $ping_path = '';
+	public $fping_path = '';
+	public $fping_result = null;
+	public $rtt = null;
+
 
 
 
@@ -449,11 +461,15 @@ class Scan extends Common_functions {
 	    $out = null;
 	    if(sizeof($output)>0) {
 	    	foreach($output as $line) {
-if (!preg_match('/timed out/', $line)) {
-		    	$tmp = explode(" ",$line);
-		    	$out[] = $tmp[0];
-					}
+	    		// only echo replies, same format in fping 3.x - 5.x:
+	    		//	3.x/4.x: "10.0.0.1 : [0], 84 bytes, 0.38 ms (0.38 avg, 0% loss)"
+	    		//	5.x:     "10.0.0.1   : [0], 64 bytes, 0.31 ms (0.31 avg, 0% loss)"	(host padded)
+	    		// skips 5.x "10.0.0.2 : [0], timed out (NaN avg, 100% loss)" and "received packet too short..."
+	    		if (preg_match('/^(\S+)\s+: \[\d+\], \d+ bytes/', $line, $m)) {
+	    			$out[] = $m[1];
+	    		}
 	    	}
+	    	$out = is_array($out) ? array_values(array_unique($out)) : $out;
 	    }
 
 	    # save to var
@@ -761,6 +777,7 @@ if (!preg_match('/timed out/', $line)) {
 		//fetch start and stop addresses
 		$boundaries = (object) $Subnets->get_network_boundaries ($subnet, $mask);
 		//create array
+		$ip = array();
 		if($mask==32) {
 			$ip[] = $Subnets->transform_to_decimal($boundaries->network);
 		}
@@ -797,9 +814,11 @@ if (!preg_match('/timed out/', $line)) {
     // if some exist remove them
     if(is_array($addresses) && is_array($ip) && sizeof($ip)>0) {
       foreach($addresses as $a) {
-        if( $a->excludePing === 1) {
+        if( $a->excludePing == 1) {
         	$key = array_search($a->ip_addr, $ip);
-          unset($ip[$key]);
+        	if($key !== false) {
+        		unset($ip[$key]);
+        	}
         }
       }
       //reindex array for pinging
@@ -844,13 +863,16 @@ if (!preg_match('/timed out/', $line)) {
 	 * @param mixed $subnet
 	 * @return void
 	 */
-	public function prepare_addresses_to_discover_subnet ($subnet) {
+	public function prepare_addresses_to_discover_subnet ($subnet, $die = true) {
 		//set subnet / mask
 		$subnet_parsed = explode("/", $subnet);
 		# result
 		$ip = $this->get_all_possible_subnet_addresses ($subnet_parsed[0], $subnet_parsed[1]);
 		//none to scan?
-		if(sizeof($ip)==0)									{ die(json_encode(array("status"=>1, "error"=>"Didn't find any address to scan!"))); }
+		if(sizeof($ip)==0)	{
+			if ($die)										{ die(json_encode(array("status"=>1, "error"=>"Didn't find any address to scan!"))); }
+			else											{ return array(); }
+		}
 		//result
 		return $ip;
 	}

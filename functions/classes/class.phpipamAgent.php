@@ -120,6 +120,14 @@ class phpipamAgent extends Common_functions {
 	private $scan_types = null;
 
 	/**
+	 * Scan type lock file handle, held until process exits
+	 *
+	 * @var resource|false
+	 * @access private
+	 */
+	private $lock_fh = false;
+
+	/**
 	 * ping type - selected
 	 *
 	 * (default value: null)
@@ -285,6 +293,36 @@ class phpipamAgent extends Common_functions {
 		}
 		// ok, save
 		$this->scan_type = $type;
+	}
+
+	/**
+	 * Makes sure only one scan of this type runs at a time for this agent
+	 *
+	 *	Overlapping runs (e.g. cron starting while previous discovery is still running)
+	 *	would discover and insert the same addresses twice. Lock is released by the OS
+	 *	when the process exits, so a crashed or killed run never leaves a stale lock.
+	 *
+	 * @access public
+	 * @return void
+	 */
+	public function lock_scan_type () {
+		// one lock per agent key + scan type - copies installed in different dirs with same key are the same agent
+		$lock_dir  = !empty($this->config->lock_dir) ? $this->config->lock_dir : sys_get_temp_dir();
+		$lock_file = rtrim($lock_dir, "/")."/phpipam-agent-".md5($this->config->key)."-".$this->scan_type.".lock";
+
+		// read-only fallback, lock file may have been created by another user
+		// "e" = close-on-exec, fping/ping must not inherit the lock
+		$this->lock_fh = @fopen($lock_file, "ce") ?: @fopen($lock_file, "re");
+		if ($this->lock_fh === false) {
+			$this->Result->throw_exception (500, "Cannot open lock file $lock_file");
+		}
+		// another run of same type in progress - stop
+		if (!flock($this->lock_fh, LOCK_EX | LOCK_NB)) {
+			print "phpipam-agent: another '".$this->scan_type."' scan is already running (lock $lock_file), exiting\n";
+			exit(1);
+		}
+		// forked scan threads must not hold the lock - orphans of a killed run would keep it forever
+		PingThread::$close_in_child[] = $this->lock_fh;
 	}
 
 	/**
@@ -699,23 +737,21 @@ class phpipamAgent extends Common_functions {
 		catch (Exception $e) {
 			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 		}
-		# die if nothing to scan
-		if (sizeof($subnets)==0)	{ die(); }
+		# nothing to scan
+		if (!is_array($subnets) || sizeof($subnets)==0)	{ return array(); }
         // if subnet has slaves dont check it
         foreach ($subnets as $k=>$s) {
     		try { $count = $this->Database->numObjectsFilter("subnets", "masterSubnetId", $s->id); }
     		catch (Exception $e) {
     			$this->Result->show("danger", _("Error: ").$e->getMessage());
-    			return false;
+    			return array();
     		}
         	if ($count>0) {
         		unset($subnets[$k]);
         	}
     	}
-		# die if nothing to scan
-		if (!isset($subnets))	   { die(); }
-		# result
-		return $subnets;
+		# result - reindex, threaded scans walk subnets by numeric index
+		return array_values($subnets);
 	}
 
 	/**
@@ -727,29 +763,24 @@ class phpipamAgent extends Common_functions {
 	 * @return void
 	 */
 	private function mysql_fetch_addresses ($subnets, $type) {
+		$addresses_tmp = array();
+		$addresses     = array();
 		// array check
-		if(!is_array($subnets))     { die(); }
+		if(!is_array($subnets))     { return array($addresses_tmp, $addresses); }
 		// loop through subnets and save addresses to scan
 		foreach($subnets as $s) {
 			// if subnet has slaves dont check it
 			if ($this->mysql_check_slaves ($s->id) === false) {
-				$addresses_tmp[$s->id] = $this->Scan->prepare_addresses_to_scan ($type, $s->id);
+				// never die here - a full subnet (nothing left to discover) must not stop scanning of other subnets
+				$addresses_tmp[$s->id] = $this->Scan->prepare_addresses_to_scan ($type, $s->id, false);
 			}
 		}
-		// if false exit
-		if(!isset($addresses_tmp))	{ die(); }
 
 		// reindex
-		if (isset($addresses_tmp)) {
-			foreach($addresses_tmp as $s_id=>$a) {
-				foreach($a as $ip) {
-					$addresses[] = array("subnetId"=>$s_id, "ip_addr"=>$ip);
-				}
+		foreach($addresses_tmp as $s_id=>$a) {
+			foreach($a as $ip) {
+				$addresses[] = array("subnetId"=>$s_id, "ip_addr"=>$ip);
 			}
-		}
-		else {
-			$addresses_tmp 	= array();
-			$addresses 		= array();
 		}
 		// return result - $addresses_tmp = existing, $addresses = reindexed
 		return array($addresses_tmp, $addresses);
@@ -811,6 +842,7 @@ class phpipamAgent extends Common_functions {
 						while (!feof($file_descriptor)) {
 							$child_response .= fread($file_descriptor, 8192);
 						}
+						fclose($file_descriptor);
 						//we have the child data in the parent, but serialized:
 						$child_response = unserialize( $child_response );
 						//store
@@ -819,24 +851,48 @@ class phpipamAgent extends Common_functions {
 						unlink( $child_pipe );
 						unset($threads[$index]);
 					}
+					// child died without creating pipe - don't wait forever
+					elseif (!$thread->isAlive()) {
+						$subnets[$index]->discovered = array();
+						unset($threads[$index]);
+					}
 				}
+				usleep(10000);
 		    }
 		}
 
-		//fping finds all subnet addresses, we must remove existing ones !
+		// return result
+		return $this->mysql_filter_fping_results ($subnets, $addresses_tmp);
+	}
+
+	/**
+	 * fping finds all alive subnet addresses, keep only the ones we asked for
+	 *
+	 *	discovery: addresses not yet in database
+	 *	update:    addresses existing in database
+	 *
+	 * @access private
+	 * @param array $subnets
+	 * @param array $addresses_tmp
+	 * @return array
+	 */
+	private function mysql_filter_fping_results ($subnets, $addresses_tmp) {
 		foreach($subnets as $sk=>$s) {
-			if (is_array($s->discovered)) {
+			if (isset($s->discovered) && is_array($s->discovered)) {
+				$requested = isset($addresses_tmp[$s->id]) && is_array($addresses_tmp[$s->id]) ? $addresses_tmp[$s->id] : array();
 				foreach($s->discovered as $rk=>$result) {
-					if(!in_array($this->transform_to_decimal($result), $addresses_tmp[$s->id])) {
+					if(!in_array($this->transform_to_decimal($result), $requested)) {
 						unset($subnets[$sk]->discovered[$rk]);
 					}
 				}
 				//rekey
 				$subnets[$sk]->discovered = array_values($subnets[$sk]->discovered);
 			}
+			else {
+				$subnets[$sk]->discovered = array();
+			}
 		}
-
-		// return result
+		// result
 		return $subnets;
 	}
 
@@ -881,6 +937,7 @@ class phpipamAgent extends Common_functions {
 	                    unset($threads[$index]);
 	                }
 	            }
+	            usleep(10000);
 	        }
 		}
 
@@ -914,6 +971,8 @@ class phpipamAgent extends Common_functions {
 			// ping
 			$subnets[$sk]->discovered = fping_subnet ($this->transform_to_dotted($s->subnet)."/".$s->mask);
 		}
+		// fping finds all alive subnet addresses, keep only requested ones
+		$subnets = $this->mysql_filter_fping_results ($subnets, $addresses_tmp);
 /*
 
 		// run separately for each host
@@ -990,8 +1049,11 @@ class phpipamAgent extends Common_functions {
 	 */
 	private function mysql_scan_discover_hosts_ping_nonthreaded ($subnets, $addresses) {
 
-		for ($i = 0; $i <= sizeof($addresses); $i++) {
-			ping_address( $this->transform_to_dotted( $addresses[$i]['ip_addr']) );
+		// use own Scan object - global $Scan is set to exit() with ping status (for threads)
+		foreach ($addresses as $k=>$a) {
+			if ($this->Scan->ping_address( $this->transform_to_dotted( $a['ip_addr']) ) != 0) {
+				unset($addresses[$k]);
+			}
 		}
 
 		//ok, we have all available addresses, rekey them
@@ -1073,6 +1135,11 @@ class phpipamAgent extends Common_functions {
 		# execute
 		try { $this->Database->insertObject("ipaddresses", $insert); }
 		catch (Exception $e) {
+			// already exists (added after addresses were fetched, e.g. by an overlapping agent run) - skip it, don't stop the agent
+			if ($e->getCode() == 23000) {
+				print "Warning: address ".$this->transform_to_dotted($insert['ip_addr'])." already exists in subnet ".$insert['subnetId'].", skipping\n";
+				return false;
+			}
 			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 			return false;
 		}
@@ -1095,7 +1162,7 @@ class phpipamAgent extends Common_functions {
 		}
 		// loop
 		foreach ($subnets as $s) {
-			if (is_array($s->discovered)) {
+			if (isset($s->discovered) && is_array($s->discovered)) {
 				foreach ($s->discovered as $ip) {
 					# execute
 					$query = "update `ipaddresses` set `lastSeen` = ? where `subnetId` = ? and `ip_addr` = ? limit 1;";

@@ -41,6 +41,9 @@ try {
 	// set scan type - status update (update) or discover, must be provided via argv[1]
 	$phpipam_agent->set_scan_type ($argv[1]);
 
+	// stop if another scan of same type is still running
+	$phpipam_agent->lock_scan_type ();
+
 	// execute
 	$phpipam_agent->execute ();
 

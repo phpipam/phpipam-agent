@@ -7,6 +7,29 @@ require_once( dirname(__FILE__) . '/classes/class.Config.php' );
 $config = Config::ValueOf('config');
 
 /**
+ * timezone
+ *
+ *	lastSeen is written in PHP time, it must match phpIPAM server timezone.
+ *	PHP falls back to UTC when date.timezone is not set in php.ini, so use
+ *	$config['timezone'] if set, otherwise system timezone.
+ ******************************/
+if (!empty($config['timezone'])) {
+	date_default_timezone_set($config['timezone']);
+}
+elseif (!get_cfg_var('date.timezone')) {		// ini_get() reports default "UTC" on PHP 8.2+, get_cfg_var() only php.ini/-d values
+	$system_tz = getenv('TZ') ?: '';
+	if ($system_tz === '' && is_link('/etc/localtime')) {
+		$system_tz = preg_replace('#^.*/zoneinfo/#', '', readlink('/etc/localtime'));
+	}
+	if ($system_tz === '' && is_readable('/etc/timezone')) {
+		$system_tz = trim(file_get_contents('/etc/timezone'));
+	}
+	if ($system_tz !== '' && in_array($system_tz, timezone_identifiers_list())) {
+		date_default_timezone_set($system_tz);
+	}
+}
+
+/**
  * proxy to use for every internet access like update check
  ******************************/
 if (Config::ValueOf('proxy_enabled') == true) {

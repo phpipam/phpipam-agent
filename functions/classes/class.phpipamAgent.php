@@ -120,6 +120,14 @@ class phpipamAgent extends Common_functions {
 	private $scan_types = null;
 
 	/**
+	 * Scan type lock file handle, held until process exits
+	 *
+	 * @var resource|false
+	 * @access private
+	 */
+	private $lock_fh = false;
+
+	/**
 	 * ping type - selected
 	 *
 	 * (default value: null)
@@ -285,6 +293,36 @@ class phpipamAgent extends Common_functions {
 		}
 		// ok, save
 		$this->scan_type = $type;
+	}
+
+	/**
+	 * Makes sure only one scan of this type runs at a time for this agent
+	 *
+	 *	Overlapping runs (e.g. cron starting while previous discovery is still running)
+	 *	would discover and insert the same addresses twice. Lock is released by the OS
+	 *	when the process exits, so a crashed or killed run never leaves a stale lock.
+	 *
+	 * @access public
+	 * @return void
+	 */
+	public function lock_scan_type () {
+		// one lock per agent key + scan type - copies installed in different dirs with same key are the same agent
+		$lock_dir  = !empty($this->config->lock_dir) ? $this->config->lock_dir : sys_get_temp_dir();
+		$lock_file = rtrim($lock_dir, "/")."/phpipam-agent-".md5($this->config->key)."-".$this->scan_type.".lock";
+
+		// read-only fallback, lock file may have been created by another user
+		// "e" = close-on-exec, fping/ping must not inherit the lock
+		$this->lock_fh = @fopen($lock_file, "ce") ?: @fopen($lock_file, "re");
+		if ($this->lock_fh === false) {
+			$this->Result->throw_exception (500, "Cannot open lock file $lock_file");
+		}
+		// another run of same type in progress - stop
+		if (!flock($this->lock_fh, LOCK_EX | LOCK_NB)) {
+			print "phpipam-agent: another '".$this->scan_type."' scan is already running (lock $lock_file), exiting\n";
+			exit(1);
+		}
+		// forked scan threads must not hold the lock - orphans of a killed run would keep it forever
+		PingThread::$close_in_child[] = $this->lock_fh;
 	}
 
 	/**
@@ -1097,6 +1135,11 @@ class phpipamAgent extends Common_functions {
 		# execute
 		try { $this->Database->insertObject("ipaddresses", $insert); }
 		catch (Exception $e) {
+			// already exists (added after addresses were fetched, e.g. by an overlapping agent run) - skip it, don't stop the agent
+			if ($e->getCode() == 23000) {
+				print "Warning: address ".$this->transform_to_dotted($insert['ip_addr'])." already exists in subnet ".$insert['subnetId'].", skipping\n";
+				return false;
+			}
 			$this->Result->throw_exception (500, "Error: ".$e->getMessage());
 			return false;
 		}

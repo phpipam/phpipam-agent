@@ -21,6 +21,16 @@ $config['key'] = "aad984d8314fcf644d3fb46886ea461f";
 $config['method'] 	= "fping";
 $config['pingpath'] = "/usr/local/sbin/fping";
 
+# timezone, must match phpIPAM server (e.g. "Europe/Madrid")
+#	if empty php.ini date.timezone is used, or system timezone if not set
+# ******************************/
+$config['timezone'] = "";
+
+# directory for lock files that prevent overlapping runs of same scan type
+#	(default: system temp dir)
+# ******************************/
+$config['lock_dir'] = "";
+
 # permit non-threaded checks (default: false)
 # ******************************/
 $config['nonthreaded'] = false;

@@ -461,11 +461,15 @@ class Scan extends Common_functions {
 	    $out = null;
 	    if(sizeof($output)>0) {
 	    	foreach($output as $line) {
-if (!preg_match('/timed out/', $line)) {
-		    	$tmp = explode(" ",$line);
-		    	$out[] = $tmp[0];
-					}
+	    		// only echo replies, same format in fping 3.x - 5.x:
+	    		//	3.x/4.x: "10.0.0.1 : [0], 84 bytes, 0.38 ms (0.38 avg, 0% loss)"
+	    		//	5.x:     "10.0.0.1   : [0], 64 bytes, 0.31 ms (0.31 avg, 0% loss)"	(host padded)
+	    		// skips 5.x "10.0.0.2 : [0], timed out (NaN avg, 100% loss)" and "received packet too short..."
+	    		if (preg_match('/^(\S+)\s+: \[\d+\], \d+ bytes/', $line, $m)) {
+	    			$out[] = $m[1];
+	    		}
 	    	}
+	    	$out = is_array($out) ? array_values(array_unique($out)) : $out;
 	    }
 
 	    # save to var

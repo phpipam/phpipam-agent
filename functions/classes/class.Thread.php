@@ -12,6 +12,13 @@ class PingThread {
     const COULD_NOT_FORK = 15;
 
 	/**
+	* file handles child must not keep open (e.g. agent run lock)
+	*
+	* @var array
+	*/
+    public static $close_in_child = array();
+
+	/**
 	* possible errors
 	*
 	* @var array
@@ -174,6 +181,7 @@ class PingThread {
         }
         else {
             // child
+            $this->close_inherited();
             pcntl_signal( SIGTERM, array( $this, 'signalHandler' ) );
             $arguments = func_get_args();
             if ( !empty( $arguments ) ) {
@@ -206,6 +214,7 @@ class PingThread {
 			$this->pid = $pid;
 
 		} else { // child
+			$this->close_inherited();
 			$this->pid = posix_getpid();//pid (child)
 			$this->ppid = posix_getppid();//pid (parent)
 
@@ -231,6 +240,19 @@ class PingThread {
 			posix_kill( $this->pid , SIGKILL);
 			exit(0);
 		}
+    }
+
+	/**
+	* closes inherited handles in child (closing, not unlocking, keeps parent lock)
+	*
+	* @return void
+	*/
+    private function close_inherited() {
+        foreach( self::$close_in_child as $fh ) {
+            if( is_resource( $fh ) ) {
+                fclose( $fh );
+            }
+        }
     }
 
 	/**
